@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dachshund Dash</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="game-shell">
+      <h1>Dachshund Dash</h1>
+      <p class="subtitle">Guide the long-haired black-and-brown dachshund to the finish flag.</p>
+
+      <canvas id="game" width="960" height="540" aria-label="Dachshund Dash game area"></canvas>
+
+      <section class="hud" aria-live="polite">
+        <span id="status">Collect 5 bones and reach the flag!</span>
+        <div id="lives" class="lives" aria-label="Lives">❤️❤️❤️</div>
+      </section>
+
+      <section class="controls-help">
+        <strong>Desktop:</strong> Arrow keys / A,D to move, W / Up / Space to jump, Down Arrow / S to dive during cape flight, F / K / Right Shift to Super Bark, R to restart
+        <button id="btn-fullscreen" class="utility-btn" aria-label="Toggle fullscreen">⛶ Fullscreen</button>
+      </section>
+
+      <section class="mobile-controls" aria-label="On-screen controls">
+        <button id="btn-left" aria-label="Move left">◀</button>
+        <button id="btn-jump" aria-label="Jump">▲</button>
+        <button id="btn-right" aria-label="Move right">▶</button>
+        <button id="btn-bark" aria-label="Super bark attack">BARK</button>
+      </section>
+
+      <section id="level-select" class="level-select hidden" aria-label="Cheat level select">
+        <div class="level-select-card henry-unlocked">
+          <h2 class="henry-title">✨ HENRY CODE UNLOCKED ✨</h2>
+          <p class="henry-sub">Secret level portal discovered. Pick your start level:</p>
+          <div class="henry-celebration" aria-hidden="true">
+            <div class="henry-dog dax-demo">
+              <span class="dax-body"></span>
+              <span class="dax-head"></span>
+              <span class="dax-ear"></span>
+              <span class="dax-tail"></span>
+              <span class="dax-leg l1"></span>
+              <span class="dax-leg l2"></span>
+            </div>
+            <div class="henry-bark bark-1"></div>
+            <div class="henry-bark bark-2"></div>
+            <div class="henry-bark bark-3"></div>
+          </div>
+          <div id="level-list" class="level-list"></div>
+          <button id="close-level-select" class="close-level-select">Close</button>
+        </div>
+      </section>
+    </main>
+
+    <script src="game.js"></script>
+  </body>
+</html>
