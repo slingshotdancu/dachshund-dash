@@ -1040,6 +1040,57 @@ function bossStatusText(level) {
   return `${level.name} BOSS: ${level.boss.name} ${level.boss.health}/${level.boss.maxHealth}`;
 }
 
+function levelObjectiveBadges(level) {
+  if (!level) return [];
+  const badges = [`${level.totalBones} bones`];
+  if (level.hearts?.length) badges.push("heart pickup");
+  if (level.capes?.length) badges.push("super cape");
+  if (level.sirens?.length) badges.push("toy vs siren");
+  if (level.boss) badges.push(`boss: ${level.boss.name}`);
+  return badges;
+}
+
+function roundedRectPath(x, y, w, h, r) {
+  const radius = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + w - radius, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+  ctx.lineTo(x + w, y + h - radius);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+  ctx.lineTo(x + radius, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+  ctx.lineTo(x, y + radius);
+  ctx.quadraticCurveTo(x, y, x + radius, y);
+  ctx.closePath();
+}
+
+function drawInfoChip(x, y, text, options = {}) {
+  const paddingX = options.paddingX ?? 12;
+  ctx.save();
+  ctx.font = options.font ?? "16px 'Roboto', system-ui";
+  const width = ctx.measureText(text).width + paddingX * 2;
+  const height = options.height ?? 32;
+  const radius = options.radius ?? 14;
+  const bg = options.bg ?? "rgba(9, 22, 44, 0.82)";
+  const border = options.border ?? "rgba(159, 229, 255, 0.45)";
+  const color = options.color ?? "#f8fdff";
+
+  ctx.fillStyle = bg;
+  ctx.strokeStyle = border;
+  ctx.lineWidth = 1.5;
+  roundedRectPath(x, y, width, height, radius);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = color;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, x + paddingX, y + height / 2 + 1);
+  ctx.restore();
+  return width;
+}
+
 function loadLevel(index, options = {}) {
   const { resetLives = false, preserveRespawns = false } = options;
 
@@ -2300,6 +2351,27 @@ function drawOverlay() {
     ctx.font = "22px 'Roboto', 'Roboto', system-ui";
     const subtitle = levelRuntime.boss ? `Boss encounter: ${levelRuntime.boss.name}` : "Get ready...";
     ctx.fillText(subtitle, canvas.width / 2, canvas.height / 2 + 28);
+
+    const badges = levelObjectiveBadges(levelRuntime);
+    if (badges.length) {
+      const chipGap = 10;
+      ctx.font = "16px 'Roboto', system-ui";
+      const chipWidths = badges.map((badge) => ctx.measureText(badge).width + 24);
+      const totalWidth = chipWidths.reduce((sum, width) => sum + width, 0) + chipGap * Math.max(0, badges.length - 1);
+      let chipX = canvas.width / 2 - totalWidth / 2;
+      const chipY = canvas.height / 2 + 52;
+      badges.forEach((badge, index) => {
+        const isBossBadge = levelRuntime.boss && badge.startsWith("boss:");
+        const bg = isBossBadge ? "rgba(78, 27, 17, 0.88)" : "rgba(9, 22, 44, 0.82)";
+        const border = isBossBadge ? "rgba(255, 189, 122, 0.58)" : "rgba(159, 229, 255, 0.45)";
+        chipX += drawInfoChip(chipX, chipY, badge, { bg, border });
+        chipX += chipGap;
+      });
+    }
+
+    ctx.font = "18px 'Roboto', 'Roboto', system-ui";
+    ctx.fillStyle = "#d9fbff";
+    ctx.fillText("Objective cards now preview what each level throws at you.", canvas.width / 2, canvas.height / 2 + 108);
     ctx.textAlign = "start";
     return;
   }
@@ -2456,6 +2528,19 @@ function render() {
   drawBarkIcon(18, 22, cooldownLeft <= 0, cooldownLeft);
   drawCapeIcon(70, 22, capeLeft > 0, Math.max(0, Math.ceil(capeLeft / 1000)));
   drawBonesHUD(state.totalBones, state.bonesCollected);
+
+  if (state.mode === "playing") {
+    ctx.save();
+    ctx.font = "16px 'Roboto', system-ui";
+    const chipText = `${level.name}`;
+    const chipWidth = ctx.measureText(chipText).width + 24;
+    drawInfoChip(canvas.width / 2 - chipWidth / 2, 10, chipText, {
+      bg: "rgba(7, 18, 36, 0.78)",
+      border: "rgba(255, 255, 255, 0.26)",
+      color: "#f8fdff",
+    });
+    ctx.restore();
+  }
 
   if (level.boss) {
     const boss = level.boss;
