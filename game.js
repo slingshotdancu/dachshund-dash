@@ -1091,6 +1091,23 @@ function drawInfoChip(x, y, text, options = {}) {
   return width;
 }
 
+function drawCenteredChipRow(y, items, options = {}) {
+  if (!items?.length) return;
+  ctx.save();
+  ctx.font = options.font ?? "15px 'Roboto', system-ui";
+  const gap = options.gap ?? 10;
+  const paddingX = options.paddingX ?? 12;
+  const widths = items.map((item) => ctx.measureText(item).width + paddingX * 2);
+  const totalWidth = widths.reduce((sum, width) => sum + width, 0) + gap * Math.max(0, items.length - 1);
+  let chipX = canvas.width / 2 - totalWidth / 2;
+  ctx.restore();
+
+  items.forEach((item, index) => {
+    chipX += drawInfoChip(chipX, y, item, options);
+    if (index < items.length - 1) chipX += gap;
+  });
+}
+
 function loadLevel(index, options = {}) {
   const { resetLives = false, preserveRespawns = false } = options;
 
@@ -2256,6 +2273,78 @@ function drawBonesHUD(total, collected) {
     ctx.stroke();
     ctx.restore();
   }
+
+  ctx.save();
+  ctx.textAlign = "right";
+  ctx.font = "bold 14px 'Roboto', system-ui";
+  ctx.fillStyle = "#f5fbff";
+  ctx.strokeStyle = "rgba(0,0,0,0.45)";
+  ctx.lineWidth = 3;
+  const label = `Bones ${collected}/${total}`;
+  const textX = canvas.width - margin;
+  const textY = y + h + 16;
+  ctx.strokeText(label, textX, textY);
+  ctx.fillText(label, textX, textY);
+  ctx.restore();
+}
+
+function drawLevelProgressHUD(level) {
+  if (!level?.worldWidth || state.mode !== "playing") return;
+
+  const barW = 260;
+  const barH = 12;
+  const x = canvas.width / 2 - barW / 2;
+  const y = canvas.height - 28;
+  const dogCenterX = state.dog.x + state.dog.w / 2;
+  const dogProgress = Math.max(0, Math.min(1, dogCenterX / level.worldWidth));
+  const flagCenterX = level.finishFlag ? level.finishFlag.x + level.finishFlag.w / 2 : level.worldWidth;
+  const flagProgress = Math.max(0, Math.min(1, flagCenterX / level.worldWidth));
+
+  ctx.save();
+  ctx.fillStyle = "rgba(5, 12, 26, 0.72)";
+  ctx.strokeStyle = "rgba(255,255,255,0.22)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(x - 10, y - 18, barW + 20, 42, 14);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = "rgba(255,255,255,0.14)";
+  ctx.beginPath();
+  ctx.roundRect(x, y, barW, barH, 999);
+  ctx.fill();
+
+  const fillW = Math.max(barH, barW * dogProgress);
+  const grad = ctx.createLinearGradient(x, 0, x + barW, 0);
+  grad.addColorStop(0, "#79e1ff");
+  grad.addColorStop(1, "#4cff88");
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.roundRect(x, y, fillW, barH, 999);
+  ctx.fill();
+
+  const flagX = x + barW * flagProgress;
+  ctx.strokeStyle = "rgba(255,255,255,0.4)";
+  ctx.beginPath();
+  ctx.moveTo(flagX, y - 4);
+  ctx.lineTo(flagX, y + barH + 4);
+  ctx.stroke();
+
+  const markerX = x + barW * dogProgress;
+  ctx.fillStyle = "#fff7d6";
+  ctx.beginPath();
+  ctx.arc(markerX, y + barH / 2, 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(0,0,0,0.4)";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.textAlign = "center";
+  ctx.font = "13px 'Roboto', system-ui";
+  ctx.fillStyle = "#eefcff";
+  ctx.fillText("Start", x + 18, y - 7);
+  ctx.fillText("Flag", Math.min(x + barW - 16, Math.max(x + 22, flagX)), y - 7);
+  ctx.restore();
 }
 
 function drawDeadDog(x, y) {
@@ -2311,6 +2400,40 @@ function drawPauseSlider(x, y, value, label, selected) {
   ctx.restore();
 }
 
+function drawPauseSummaryCard(level) {
+  const cooldownLeft = Math.max(0, state.combat.barkCooldownUntil - Date.now());
+  const capeLeft = Math.max(0, state.capeUntil - Date.now());
+  const cardW = 370;
+  const cardH = 120;
+  const x = canvas.width / 2 - cardW / 2;
+  const y = canvas.height / 2 + 42;
+
+  ctx.save();
+  ctx.fillStyle = "rgba(7, 18, 36, 0.82)";
+  ctx.strokeStyle = "rgba(159, 229, 255, 0.32)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(x, y, cardW, cardH, 16);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#f8fdff";
+  ctx.font = "bold 18px 'Roboto', system-ui";
+  ctx.fillText(`${level.name} snapshot`, x + 16, y + 26);
+
+  ctx.font = "15px 'Roboto', system-ui";
+  ctx.fillStyle = "#d9fbff";
+  ctx.fillText(`Bones: ${state.bonesCollected}/${state.totalBones}`, x + 16, y + 52);
+  ctx.fillText(`Lives: ${state.lives}/${MAX_LIVES} • Continues: ${state.levelRespawnsLeft}`, x + 16, y + 74);
+
+  const barkText = cooldownLeft > 0 ? `recharging ${Math.ceil(cooldownLeft / 1000)}s` : "ready";
+  const capeText = capeLeft > 0 ? `active ${Math.ceil(capeLeft / 1000)}s` : "inactive";
+  ctx.fillText(`Super Bark: ${barkText}`, x + 16, y + 98);
+  ctx.fillText(`Cape: ${capeText}`, x + 188, y + 98);
+  ctx.restore();
+}
+
 function drawLogo(x, y, scale = 0.5) {
   const img = getImage(LOGO_IMG);
   if (!img || !img.complete || !img.naturalWidth) return;
@@ -2337,6 +2460,24 @@ function drawOverlay() {
     ctx.fillText("Guide the long-haired dachshund to the flag.", canvas.width / 2, canvas.height / 2 + 92);
     ctx.fillStyle = "#9fe5ff";
     ctx.fillText("Press Space/Jump or tap to start", canvas.width / 2, canvas.height / 2 + 126);
+    drawCenteredChipRow(canvas.height / 2 + 154, ["Move: A/D or ←/→", "Jump: W / ↑ / Space", "Bark: F / K / Shift"], {
+      font: "15px 'Roboto', system-ui",
+      paddingX: 12,
+      height: 30,
+      gap: 10,
+      bg: "rgba(9, 22, 44, 0.82)",
+      border: "rgba(159, 229, 255, 0.45)",
+      color: "#f8fdff",
+    });
+    drawCenteredChipRow(canvas.height / 2 + 192, ["Restart: R", "Pause: Esc", "Touch: on-screen buttons"], {
+      font: "15px 'Roboto', system-ui",
+      paddingX: 12,
+      height: 30,
+      gap: 10,
+      bg: "rgba(17, 34, 64, 0.8)",
+      border: "rgba(121, 225, 255, 0.3)",
+      color: "#dff8ff",
+    });
     ctx.textAlign = "start";
     return;
   }
@@ -2395,7 +2536,10 @@ function drawOverlay() {
     ctx.fillStyle = "#fff";
     ctx.font = "bold 48px 'Flubby', 'Roboto', system-ui";
     ctx.textAlign = "center";
-    ctx.fillText("PAUSED", canvas.width / 2, canvas.height / 2 - 70);
+    ctx.fillText("PAUSED", canvas.width / 2, canvas.height / 2 - 108);
+    ctx.font = "18px 'Roboto', 'Roboto', system-ui";
+    ctx.fillStyle = "#d9fbff";
+    ctx.fillText("Quick status stays visible here so you can resume without losing the thread.", canvas.width / 2, canvas.height / 2 - 78);
     ctx.font = "22px 'Roboto', 'Roboto', system-ui";
     if (state.pauseMenu === "main") {
       const sel = state.pauseOptionIndex || 0;
@@ -2403,15 +2547,21 @@ function drawOverlay() {
       opts.forEach((opt, i) => {
         const isSel = sel === i;
         ctx.fillStyle = isSel ? "#9fe5ff" : "#fff";
-        ctx.fillText(opt, canvas.width / 2, canvas.height / 2 - 10 + i * 30);
+        ctx.fillText(opt, canvas.width / 2, canvas.height / 2 - 24 + i * 30);
       });
+      ctx.font = "17px 'Roboto', system-ui";
+      ctx.fillStyle = "#d9fbff";
+      ctx.fillText("↑/↓ select • Enter confirm • Esc resume", canvas.width / 2, canvas.height / 2 + 42);
     } else {
       const musicSelected = state.pauseOptionIndex === 0;
       const sfxSelected = state.pauseOptionIndex === 1;
-      drawPauseSlider(canvas.width / 2 - 110, canvas.height / 2 - 10, AUDIO.musicVol, "Music", musicSelected);
-      drawPauseSlider(canvas.width / 2 - 110, canvas.height / 2 + 34, AUDIO.sfxVol, "SFX", sfxSelected);
-      ctx.fillText("Enter: Save • Esc/B: Back • ←/→ adjust", canvas.width / 2, canvas.height / 2 + 70);
+      drawPauseSlider(canvas.width / 2 - 110, canvas.height / 2 - 22, AUDIO.musicVol, "Music", musicSelected);
+      drawPauseSlider(canvas.width / 2 - 110, canvas.height / 2 + 22, AUDIO.sfxVol, "SFX", sfxSelected);
+      ctx.font = "17px 'Roboto', system-ui";
+      ctx.fillStyle = "#d9fbff";
+      ctx.fillText("Enter: Save • Esc/B: Back • ←/→ adjust", canvas.width / 2, canvas.height / 2 + 62);
     }
+    drawPauseSummaryCard(levelRuntime);
     ctx.textAlign = "start";
     return;
   }
@@ -2528,6 +2678,7 @@ function render() {
   drawBarkIcon(18, 22, cooldownLeft <= 0, cooldownLeft);
   drawCapeIcon(70, 22, capeLeft > 0, Math.max(0, Math.ceil(capeLeft / 1000)));
   drawBonesHUD(state.totalBones, state.bonesCollected);
+  drawLevelProgressHUD(level);
 
   if (state.mode === "playing") {
     ctx.save();
