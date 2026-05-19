@@ -162,6 +162,17 @@ h1 {
   background: #304e8f;
 }
 
+#btn-pause {
+  width: 92px;
+  font-size: 0.9rem;
+  letter-spacing: 0.04em;
+  background: #4b2f7f;
+}
+
+#btn-pause.paused {
+  background: #2f6d58;
+}
+
 #btn-bark.cooldown {
   background: #5f4a27;
   opacity: 0.85;
