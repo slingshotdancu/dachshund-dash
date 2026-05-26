@@ -1149,8 +1149,12 @@ function levelPreviewRows(level) {
   if (level.sirens?.length) threats.push("siren slowdown");
   if (level.boss) threats.push(level.boss.name);
 
+  const goal = level.boss
+    ? `${level.totalBones} bones • defeat ${level.boss.name} • finish flag`
+    : `${level.totalBones} bones + finish flag`;
+
   return [
-    { label: "Goal", value: `${level.totalBones} bones + finish flag` },
+    { label: "Goal", value: goal },
     { label: "Pickups", value: pickups.length ? pickups.join(" • ") : "no special pickup this round" },
     { label: "Watch for", value: threats.join(" • ") },
   ];
@@ -2710,8 +2714,13 @@ function drawPauseMenuOption(x, y, w, h, label, subtitle, selected) {
 function drawPauseSummaryCard(level) {
   const cooldownLeft = Math.max(0, state.combat.barkCooldownUntil - Date.now());
   const capeLeft = Math.max(0, state.capeUntil - Date.now());
+  const bossLine = level?.boss
+    ? level.boss.dead
+      ? `Boss: ${level.boss.name} defeated • flag ready when bones are done`
+      : `Boss: ${level.boss.name} ${Math.max(0, level.boss.health)}/${level.boss.maxHealth}`
+    : "";
   const cardW = 370;
-  const cardH = 120;
+  const cardH = bossLine ? 146 : 120;
   const x = canvas.width / 2 - cardW / 2;
   const y = canvas.height / 2 + 42;
 
@@ -2738,6 +2747,11 @@ function drawPauseSummaryCard(level) {
   const capeText = capeLeft > 0 ? `active ${Math.ceil(capeLeft / 1000)}s` : "inactive";
   ctx.fillText(`Super Bark: ${barkText}`, x + 16, y + 98);
   ctx.fillText(`Cape: ${capeText}`, x + 188, y + 98);
+
+  if (bossLine) {
+    ctx.fillStyle = level.boss.dead ? "#dfffea" : "#ffe6d8";
+    ctx.fillText(bossLine, x + 16, y + 122);
+  }
   ctx.restore();
 }
 

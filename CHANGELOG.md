@@ -1,5 +1,20 @@
 # Dachshund Dash Changelog
 
+## 2026-05-26
+### Daily improvement: pause snapshot boss status
+- Expanded the **pause snapshot card** on boss stages so it now shows the live boss objective instead of dropping that context the moment players pause.
+- During boss fights, the card now displays the boss name and current **HP remaining**, making it much easier to decide whether to resume aggressively or reset.
+- If the boss is already beaten, the same line flips to a **defeated / flag-ready** reminder so the pause overlay still reflects the actual win condition.
+
+![Paused Level 10 showing the boss status line inside the snapshot card](changelog/2026-05-26-pause-boss-status-card.png)
+
+### Daily improvement: boss-level preview goal copy
+- Updated the **Level preview** card on boss stages so the **Goal** row no longer implies the flag alone is enough.
+- Boss levels now explicitly say players must collect the bones, **defeat the boss**, and then reach the finish flag, which makes the win condition clearer before the run starts.
+- This is a small copy-only polish change, but it removes a real moment of confusion right before Levels 10 and 20.
+
+![Level 10 preview card now spelling out the boss defeat requirement in the goal row](changelog/2026-05-26-boss-preview-goal.png)
+
 ## 2026-05-25
 ### Daily improvement: level intro start prompt
 - Added a visible **start prompt bar** inside the new level-intro preview card so players no longer have to guess how to leave the intro overlay and begin the level.
