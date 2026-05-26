@@ -1,5 +1,87 @@
 # Dachshund Dash Changelog
 
+## 2026-05-25
+### Daily improvement: level intro start prompt
+- Added a visible **start prompt bar** inside the new level-intro preview card so players no longer have to guess how to leave the intro overlay and begin the level.
+- The prompt explicitly calls out **Space**, **jump**, and **touch ▲** input paths, which makes the transition from reading the preview to actually playing much clearer.
+- Kept the prompt animated and integrated with the existing preview card so the instruction feels like part of the game UI instead of a stray status line.
+
+![Level intro overlay showing the new start prompt inside the preview card](changelog/2026-05-25-level-intro-start-prompt.png)
+
+### Daily improvement: level intro preview card
+- Added a new **Level preview** card to the level-intro overlay so players get a readable summary before they start moving.
+- The card now spells out the current level's **goal**, available **pickups**, and the main **threats** waiting in the run, instead of leaving that context split across small badges.
+- Also surfaced a quick **continues restock** reminder there, which makes each level start feel more intentional for quick retries.
+
+![Level intro overlay showing the new preview card with goal, pickups, and threat details](changelog/2026-05-25-level-preview-card.png)
+
+## 2026-05-24
+### Daily improvement: pause menu keyboard selection
+- Fixed a real pause-menu UX gap: the overlay already told players to use **↑/↓ to select**, but those keys did not actually move between **Continue** and **Options**.
+- The pause menu cards now support proper **Up/Down selection** and **Enter/Space confirmation**, so the on-screen hint finally matches the controls.
+- This makes the pause overlay feel intentional instead of misleading, especially for keyboard-first players stopping mid-run.
+
+![Paused gameplay showing keyboard selection working on the pause menu and opening the options screen](changelog/2026-05-24-pause-menu-keyboard-nav.png)
+
+### Daily improvement: run summary ability pill
+- Added a new **run summary ability pill** below the canvas so players can read core power state without relying on the in-canvas HUD alone.
+- The pill now reports **Super Bark ready vs cooldown**, **toy held** for siren levels, and **cape active vs inactive** in one glanceable line.
+- This keeps moment-to-moment ability status visible in the page chrome, which is especially helpful on quick restarts and for players scanning below the playfield.
+
+![Start screen showing the new run summary ability pill for Bark and Cape state](changelog/2026-05-24-run-summary-power-pill.png)
+
+## 2026-05-23
+### Daily improvement: stateful run summary strip
+- Upgraded the new **run summary strip** so each pill now changes color with its current state instead of reading like static chrome.
+- The strip now highlights **bone collection** in amber, **boss objectives** in warm danger tones, **paused / continue / restart** states in distinct warning colors, and **flag-ready / clear** states in bright green.
+- This makes the summary easier to scan peripherally during quick resets and mid-run pauses without adding new gameplay complexity.
+
+### Daily improvement: live run summary strip
+- Added a visible **run summary strip** below the canvas that mirrors the current **level**, **bone count**, and **next objective** outside the canvas-only HUD.
+- The goal pill now updates with context like **start prompt**, **bones remaining**, **boss defeat required**, **touch the flag**, and **paused / restart** states, making progress easier to read at a glance.
+- This is especially helpful for accessibility and quick scanning because the key objective no longer lives only inside the animated playfield.
+
+![Gameplay with the new live run summary strip under the canvas](changelog/2026-05-23-run-summary-strip.png)
+
+## 2026-05-22
+### Daily improvement: start prompt call-to-action card
+- Replaced the plain start-screen **"Press Space/Jump or tap to start"** line with a more readable **rounded call-to-action card** so the first input prompt stands out immediately.
+- Added a subtle glow pulse and play-arrow treatment to make the starting action easier to spot without changing any gameplay rules.
+
+![Start screen with the new rounded start prompt card](changelog/2026-05-22-start-prompt-card.png)
+
+### Daily improvement: pause menu option cards
+- Reworked the pause overlay's main menu from plain text into readable **selection cards** for **Continue** and **Options**, making the current choice easier to scan when stopping mid-run.
+- Added short helper subtitles and a clear active chevron/highlight so the pause flow feels more like an intentional game menu than a debug overlay.
+
+![Paused gameplay showing the new pause menu option cards](changelog/2026-05-22-pause-menu-cards.png)
+
+## 2026-05-21
+### Daily improvement: start-screen objective chips
+- Added a highlighted **goal chip row** to the title screen that spells out the real win condition: **collect every bone**, **survive hazards**, and **then touch the flag**.
+- This gives first-time players the objective before they begin, instead of learning mid-run that the flag alone is not enough.
+
+![Start screen with the new objective chips explaining how to finish a level](changelog/2026-05-21-start-screen-objective-chips.png)
+
+### Daily improvement: start-screen Henry portal hint
+- Added a visible **secret hint** to the start screen that tells players to type **`HENRY`** for the level-select portal, so the existing cheat unlock is discoverable without needing the README or source.
+- Kept the hint small and in-theme so it helps curious players without crowding the core start prompt.
+
+![Start screen showing the new HENRY level-select portal hint](changelog/2026-05-21-henry-start-screen-hint.png)
+
+## 2026-05-20
+### Daily improvement: readable continues counter
+- Upgraded the shell HUD's lives area from emoji-only output to a clearer **Continues X/Y** counter alongside the dog icons, so players can tell how many retries remain without counting symbols.
+- Added matching accessibility text on the lives widget so screen readers announce the same retry state explicitly.
+
+![HUD showing the new readable continues counter beside the dog icons](changelog/2026-05-20-continues-counter.png)
+
+### Daily improvement: desktop pause button
+- Added a visible **Pause / Resume** button beside **Fullscreen** in the desktop controls row so mouse-first players can stop and restart a run without remembering keyboard shortcuts.
+- Wired the button into the existing pause system and matching paused styling, so it flips to **Resume** while the overlay is active.
+
+![Desktop gameplay paused with the new Pause / Resume button beside Fullscreen](changelog/2026-05-20-desktop-pause-button.png)
+
 ## 2026-05-19
 ### Daily improvement: touch faint-screen recovery
 - Fixed a mobile recovery gap on the **YOU FAINTED** screen: touch players can now tap **▲** to continue from a lost life or **BARK** to quit back out, instead of getting stranded behind keyboard-only controls.

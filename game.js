@@ -2,10 +2,17 @@ const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 const statusEl = document.getElementById("status");
 const livesEl = document.getElementById("lives"); // shows lives/continues as dog heads
+const livesIconsEl = document.getElementById("lives-icons");
+const continuesLabelEl = document.getElementById("continues-label");
 const levelSelectEl = document.getElementById("level-select");
 const levelListEl = document.getElementById("level-list");
 const closeLevelSelectEl = document.getElementById("close-level-select");
+const pauseDesktopBtn = document.getElementById("btn-pause-desktop");
 const fullscreenBtn = document.getElementById("btn-fullscreen");
+const summaryLevelEl = document.getElementById("summary-level");
+const summaryBonesEl = document.getElementById("summary-bones");
+const summaryPowerEl = document.getElementById("summary-power");
+const summaryGoalEl = document.getElementById("summary-goal");
 
 const bgMusic = { audio: null, started: false };
 let capeAudio = null;
@@ -404,8 +411,89 @@ function barkReady() {
 
 function renderLives() {
   if (!livesEl) return;
+  const continues = Math.max(0, state.levelRespawnsLeft);
   const head = "🐶";
-  livesEl.textContent = `${head.repeat(Math.max(0, state.levelRespawnsLeft))}`;
+  if (livesIconsEl) livesIconsEl.textContent = head.repeat(continues);
+  if (continuesLabelEl) continuesLabelEl.textContent = `Continues ${continues}/${LEVEL_RESPAWNS}`;
+  livesEl.setAttribute("aria-label", `Continues ${continues} of ${LEVEL_RESPAWNS}`);
+}
+
+function runSummaryGoal(level = levelRuntime) {
+  if (state.mode === "start") return { text: "Press Space/Jump or tap to start.", tone: "start" };
+  if (state.mode === "title") return { text: `Collect ${state.totalBones} bones, then touch the flag.`, tone: "collect" };
+  if (state.mode === "paused") return { text: "Paused · Esc resumes.", tone: "paused" };
+  if (state.mode === "celebrating") return { text: "Level clear! Next level loading…", tone: "clear" };
+  if (state.mode === "dead") {
+    return state.levelRespawnsLeft > 0
+      ? { text: `Continue available · ${state.levelRespawnsLeft} left.`, tone: "warning" }
+      : { text: "No continues left.", tone: "danger" };
+  }
+  if (state.mode === "gameover") return { text: "Press Q, Enter, or Space to restart.", tone: "danger" };
+  if (state.mode === "won") return { text: "All levels clear — press R or tap ▲ to play again.", tone: "clear" };
+
+  const bonesLeft = Math.max(0, state.totalBones - state.bonesCollected);
+  if (bonesLeft > 0) {
+    return {
+      text: bonesLeft === 1 ? "Collect 1 more bone." : `Collect ${bonesLeft} more bones.`,
+      tone: "collect",
+    };
+  }
+  if (level?.boss && !level.boss.dead) return { text: `Defeat ${level.boss.name}.`, tone: "boss" };
+  return { text: "Touch the flag.", tone: "ready" };
+}
+
+function runSummaryPower(level = levelRuntime) {
+  if (state.mode === "start") return { text: "Bark ready · Cape inactive", tone: "boost" };
+  if (state.mode === "paused") return { text: "Abilities frozen while paused.", tone: "paused" };
+  if (state.mode === "dead" || state.mode === "gameover") return { text: "Abilities reset on retry.", tone: "warning" };
+  if (state.mode === "won") return { text: "Champion lap unlocked. ✨", tone: "clear" };
+
+  const barkLeft = Math.max(0, state.combat.barkCooldownUntil - Date.now());
+  const capeLeft = Math.max(0, state.capeUntil - Date.now());
+  const parts = [];
+
+  if (state.toyHeld) {
+    parts.push("Toy ready");
+  } else {
+    parts.push(barkLeft > 0 ? `Bark ${Math.ceil(barkLeft / 1000)}s` : "Bark ready");
+  }
+
+  parts.push(capeLeft > 0 ? `Cape ${Math.ceil(capeLeft / 1000)}s` : "Cape inactive");
+
+  let tone = "level";
+  if (state.toyHeld || capeLeft > 0) tone = "boost";
+  else if (barkLeft <= 0) tone = "ready";
+  else tone = "warning";
+
+  if (level?.boss && !level.boss.dead && !state.toyHeld && barkLeft <= 0) {
+    return { text: `${parts.join(" · ")} · Boss pressure on.`, tone: "boss" };
+  }
+
+  return { text: parts.join(" · "), tone };
+}
+
+function renderRunSummary(level = levelRuntime) {
+  if (summaryLevelEl) {
+    summaryLevelEl.textContent = level?.name || "Level 1";
+    summaryLevelEl.dataset.tone = state.mode === "paused" ? "paused" : "level";
+  }
+
+  if (summaryBonesEl) {
+    summaryBonesEl.textContent = `Bones ${state.bonesCollected}/${state.totalBones}`;
+    summaryBonesEl.dataset.tone = state.bonesCollected >= state.totalBones ? "complete" : "collect";
+  }
+
+  if (summaryPowerEl) {
+    const power = runSummaryPower(level);
+    summaryPowerEl.textContent = power.text;
+    summaryPowerEl.dataset.tone = power.tone;
+  }
+
+  if (summaryGoalEl) {
+    const goal = runSummaryGoal(level);
+    summaryGoalEl.textContent = goal.text;
+    summaryGoalEl.dataset.tone = goal.tone;
+  }
 }
 
 function goToStartScreen() {
@@ -1050,6 +1138,24 @@ function levelObjectiveBadges(level) {
   return badges;
 }
 
+function levelPreviewRows(level) {
+  if (!level) return [];
+  const pickups = [];
+  if (level.hearts?.length) pickups.push("heart pickup");
+  if (level.capes?.length) pickups.push("super cape");
+  if (level.sirens?.length) pickups.push("toy toss");
+
+  const threats = ["spikes", "corgi patrols"];
+  if (level.sirens?.length) threats.push("siren slowdown");
+  if (level.boss) threats.push(level.boss.name);
+
+  return [
+    { label: "Goal", value: `${level.totalBones} bones + finish flag` },
+    { label: "Pickups", value: pickups.length ? pickups.join(" • ") : "no special pickup this round" },
+    { label: "Watch for", value: threats.join(" • ") },
+  ];
+}
+
 function roundedRectPath(x, y, w, h, r) {
   const radius = Math.min(r, w / 2, h / 2);
   ctx.beginPath();
@@ -1106,6 +1212,95 @@ function drawCenteredChipRow(y, items, options = {}) {
     chipX += drawInfoChip(chipX, y, item, options);
     if (index < items.length - 1) chipX += gap;
   });
+}
+
+function drawStartPromptCard(y, text) {
+  const pulse = (Math.sin(Date.now() / 280) + 1) / 2;
+  ctx.save();
+  ctx.font = "bold 20px 'Roboto', system-ui";
+  const paddingX = 22;
+  const width = ctx.measureText(text).width + paddingX * 2;
+  const height = 44;
+  const x = canvas.width / 2 - width / 2;
+
+  ctx.shadowColor = `rgba(120, 225, 255, ${0.18 + pulse * 0.24})`;
+  ctx.shadowBlur = 16 + pulse * 10;
+  ctx.fillStyle = "rgba(9, 22, 44, 0.9)";
+  ctx.strokeStyle = `rgba(159, 229, 255, ${0.45 + pulse * 0.35})`;
+  ctx.lineWidth = 2;
+  roundedRectPath(x, y, width, height, 18);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "#eafcff";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, canvas.width / 2, y + height / 2 + 1);
+  ctx.restore();
+}
+
+function drawLevelPreviewCard(x, y, level) {
+  const rows = levelPreviewRows(level);
+  if (!rows.length) return;
+
+  const width = 540;
+  const height = 150;
+  const rowGap = 28;
+
+  ctx.save();
+  ctx.fillStyle = "rgba(8, 16, 32, 0.9)";
+  ctx.strokeStyle = "rgba(121, 225, 255, 0.34)";
+  ctx.lineWidth = 2;
+  roundedRectPath(x, y, width, height, 20);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
+  roundedRectPath(x + 14, y + 14, width - 28, height - 28, 16);
+  ctx.fill();
+
+  ctx.fillStyle = "#ecfbff";
+  ctx.font = "bold 17px 'Roboto', system-ui";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText("Level preview", x + 20, y + 22);
+
+  rows.forEach((row, index) => {
+    const rowY = y + 52 + index * rowGap;
+    ctx.fillStyle = "#79e1ff";
+    ctx.font = "bold 14px 'Roboto', system-ui";
+    ctx.fillText(`${row.label}:`, x + 20, rowY);
+
+    ctx.fillStyle = "#f6fbff";
+    ctx.font = "14px 'Roboto', system-ui";
+    ctx.fillText(row.value, x + 116, rowY);
+  });
+
+  ctx.fillStyle = "rgba(210, 240, 255, 0.82)";
+  ctx.font = "13px 'Roboto', system-ui";
+  ctx.fillText("Each level still restocks 3 continues before you jump in.", x + 20, y + 115);
+
+  const pulse = (Math.sin(Date.now() / 280) + 1) / 2;
+  const promptY = y + height - 34;
+  const promptX = x + 20;
+  const promptW = width - 40;
+  const promptH = 28;
+  ctx.shadowColor = `rgba(120, 225, 255, ${0.14 + pulse * 0.18})`;
+  ctx.shadowBlur = 12 + pulse * 6;
+  ctx.fillStyle = "rgba(10, 26, 50, 0.95)";
+  ctx.strokeStyle = `rgba(159, 229, 255, ${0.32 + pulse * 0.24})`;
+  ctx.lineWidth = 1.5;
+  roundedRectPath(promptX, promptY, promptW, promptH, 12);
+  ctx.fill();
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  ctx.fillStyle = "#eafcff";
+  ctx.font = "bold 13px 'Roboto', system-ui";
+  ctx.textAlign = "center";
+  ctx.fillText("▶ Press Space, Jump, or tap ▲ to start this level", x + width / 2, promptY + promptH / 2 + 1);
+  ctx.restore();
 }
 
 function loadLevel(index, options = {}) {
@@ -2482,6 +2677,36 @@ function drawPauseSlider(x, y, value, label, selected) {
   ctx.restore();
 }
 
+function drawPauseMenuOption(x, y, w, h, label, subtitle, selected) {
+  ctx.save();
+  ctx.fillStyle = selected ? "rgba(18, 46, 74, 0.92)" : "rgba(7, 18, 36, 0.74)";
+  ctx.strokeStyle = selected ? "rgba(159, 229, 255, 0.88)" : "rgba(159, 229, 255, 0.26)";
+  ctx.lineWidth = selected ? 2.5 : 1.5;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 16);
+  ctx.fill();
+  ctx.stroke();
+
+  if (selected) {
+    ctx.fillStyle = "rgba(76, 255, 136, 0.94)";
+    ctx.beginPath();
+    ctx.moveTo(x + 16, y + h / 2);
+    ctx.lineTo(x + 28, y + h / 2 - 8);
+    ctx.lineTo(x + 28, y + h / 2 + 8);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  ctx.textAlign = "left";
+  ctx.fillStyle = selected ? "#f6feff" : "#ffffff";
+  ctx.font = "bold 21px 'Roboto', system-ui";
+  ctx.fillText(label, x + 42, y + 24);
+  ctx.fillStyle = selected ? "#dff8ff" : "rgba(217, 251, 255, 0.88)";
+  ctx.font = "15px 'Roboto', system-ui";
+  ctx.fillText(subtitle, x + 42, y + 46);
+  ctx.restore();
+}
+
 function drawPauseSummaryCard(level) {
   const cooldownLeft = Math.max(0, state.combat.barkCooldownUntil - Date.now());
   const capeLeft = Math.max(0, state.capeUntil - Date.now());
@@ -2583,9 +2808,17 @@ function drawOverlay() {
       border: "rgba(206, 173, 255, 0.42)",
       color: "#f7efff",
     });
-    ctx.fillStyle = "#9fe5ff";
-    ctx.fillText("Press Space/Jump or tap to start", canvas.width / 2, canvas.height / 2 + 160);
-    drawCenteredChipRow(canvas.height / 2 + 190, ["Move: A/D or ←/→", "Jump: W / ↑ / Space", "Bark: F / K / Shift"], {
+    drawCenteredChipRow(canvas.height / 2 + 160, ["Collect every bone", "Avoid spikes + corgis", "Then touch the flag"], {
+      font: "15px 'Roboto', system-ui",
+      paddingX: 12,
+      height: 30,
+      gap: 10,
+      bg: "rgba(14, 46, 34, 0.84)",
+      border: "rgba(76, 255, 136, 0.42)",
+      color: "#ecfff0",
+    });
+    drawStartPromptCard(canvas.height / 2 + 174, "▶ Press Space/Jump or tap to start");
+    drawCenteredChipRow(canvas.height / 2 + 224, ["Move: A/D or ←/→", "Jump: W / ↑ / Space", "Bark: F / K / Shift"], {
       font: "15px 'Roboto', system-ui",
       paddingX: 12,
       height: 30,
@@ -2594,7 +2827,7 @@ function drawOverlay() {
       border: "rgba(159, 229, 255, 0.45)",
       color: "#f8fdff",
     });
-    drawCenteredChipRow(canvas.height / 2 + 226, ["Restart: R", "Pause: Esc", "Touch: on-screen buttons + pause"], {
+    drawCenteredChipRow(canvas.height / 2 + 260, ["Restart: R", "Pause: Esc", "Touch: on-screen buttons + pause"], {
       font: "15px 'Roboto', system-ui",
       paddingX: 12,
       height: 30,
@@ -2603,6 +2836,9 @@ function drawOverlay() {
       border: "rgba(121, 225, 255, 0.3)",
       color: "#dff8ff",
     });
+    ctx.font = "bold 16px 'Roboto', system-ui";
+    ctx.fillStyle = "#ffd6f4";
+    ctx.fillText("Secret: type HENRY for the level-select portal", canvas.width / 2, canvas.height / 2 + 300);
     ctx.textAlign = "start";
     return;
   }
@@ -2635,9 +2871,7 @@ function drawOverlay() {
       });
     }
 
-    ctx.font = "18px 'Roboto', 'Roboto', system-ui";
-    ctx.fillStyle = "#d9fbff";
-    ctx.fillText("Objective cards now preview what each level throws at you.", canvas.width / 2, canvas.height / 2 + 108);
+    drawLevelPreviewCard(canvas.width / 2 - 270, canvas.height / 2 + 94, levelRuntime);
     ctx.textAlign = "start";
     return;
   }
@@ -2668,15 +2902,20 @@ function drawOverlay() {
     ctx.font = "22px 'Roboto', 'Roboto', system-ui";
     if (state.pauseMenu === "main") {
       const sel = state.pauseOptionIndex || 0;
-      const opts = ["Continue", "Options"];
-      opts.forEach((opt, i) => {
-        const isSel = sel === i;
-        ctx.fillStyle = isSel ? "#9fe5ff" : "#fff";
-        ctx.fillText(opt, canvas.width / 2, canvas.height / 2 - 24 + i * 30);
+      const cardW = 330;
+      const cardH = 58;
+      const cardX = canvas.width / 2 - cardW / 2;
+      const firstY = canvas.height / 2 - 44;
+      const options = [
+        ["Continue", "Jump straight back into the level."],
+        ["Options", "Adjust music and sound effects."],
+      ];
+      options.forEach(([label, subtitle], i) => {
+        drawPauseMenuOption(cardX, firstY + i * 68, cardW, cardH, label, subtitle, sel === i);
       });
       ctx.font = "17px 'Roboto', system-ui";
       ctx.fillStyle = "#d9fbff";
-      ctx.fillText("↑/↓ select • Enter confirm • Esc resume", canvas.width / 2, canvas.height / 2 + 42);
+      ctx.fillText("↑/↓ select • Enter confirm • Esc resume", canvas.width / 2, canvas.height / 2 + 104);
     } else {
       const musicSelected = state.pauseOptionIndex === 0;
       const sfxSelected = state.pauseOptionIndex === 1;
@@ -2738,6 +2977,7 @@ function drawOverlay() {
 function render() {
   const level = levelRuntime;
   const now = Date.now();
+  renderRunSummary(level);
   const shaking = now < state.shakeUntil ? state.shakeIntensity : 0;
   const shakeX = shaking ? Math.random() * shaking * 2 - shaking : 0;
   const shakeY = shaking ? Math.random() * shaking * 2 - shaking : 0;
@@ -2879,6 +3119,13 @@ function render() {
     pauseBtn.classList.toggle("paused", paused);
   }
 
+  if (pauseDesktopBtn) {
+    const paused = state.mode === "paused";
+    pauseDesktopBtn.textContent = paused ? "Resume" : "Pause";
+    pauseDesktopBtn.classList.toggle("paused", paused);
+    pauseDesktopBtn.setAttribute("aria-label", paused ? "Resume game" : "Pause game");
+  }
+
   ctx.restore();
 }
 
@@ -2941,8 +3188,24 @@ window.addEventListener("keydown", (e) => {
       return;
     }
     if (state.pauseMenu === "main") {
+      const opts = ["continue", "options"];
+      if (["ArrowUp", "KeyW"].includes(e.code)) {
+        state.pauseOptionIndex = (state.pauseOptionIndex + opts.length - 1) % opts.length;
+        e.preventDefault();
+        return;
+      }
+      if (["ArrowDown", "KeyS"].includes(e.code)) {
+        state.pauseOptionIndex = (state.pauseOptionIndex + 1) % opts.length;
+        e.preventDefault();
+        return;
+      }
       if (["KeyC", "Enter", "Space"].includes(e.code)) {
-        resumeGame();
+        if ((state.pauseOptionIndex || 0) === 1) {
+          state.pauseMenu = "options";
+          state.pauseOptionIndex = 0;
+        } else {
+          resumeGame();
+        }
         e.preventDefault();
         return;
       }
@@ -3108,6 +3371,18 @@ if (barkBtn) {
 const pauseBtn = document.getElementById("btn-pause");
 if (pauseBtn) {
   pauseBtn.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    startBgMusic();
+    if (state.mode === "playing") {
+      pauseGame();
+    } else if (state.mode === "paused") {
+      resumeGame();
+    }
+  });
+}
+
+if (pauseDesktopBtn) {
+  pauseDesktopBtn.addEventListener("pointerdown", (e) => {
     e.preventDefault();
     startBgMusic();
     if (state.mode === "playing") {

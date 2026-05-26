@@ -15,11 +15,22 @@
 
       <section class="hud" aria-live="polite">
         <span id="status">Collect 5 bones and reach the flag!</span>
-        <div id="lives" class="lives" aria-label="Lives">❤️❤️❤️</div>
+        <div id="lives" class="lives" aria-label="Continues 3 of 3">
+          <span id="lives-icons" class="lives-icons">🐶🐶🐶</span>
+          <span id="continues-label" class="continues-label">Continues 3/3</span>
+        </div>
+      </section>
+
+      <section class="run-summary" aria-label="Run progress summary">
+        <span id="summary-level" class="summary-pill">Level 1</span>
+        <span id="summary-bones" class="summary-pill">Bones 0/5</span>
+        <span id="summary-power" class="summary-pill">Bark ready · Cape inactive</span>
+        <span id="summary-goal" class="summary-pill summary-pill-goal">Press Space/Jump or tap to start.</span>
       </section>
 
       <section class="controls-help">
         <strong>Desktop:</strong> Arrow keys / A,D to move, W / Up / Space to jump, Down Arrow / S to dive during cape flight, F / K / Right Shift to Super Bark, R to restart
+        <button id="btn-pause-desktop" class="utility-btn utility-btn-pause" aria-label="Pause or resume">Pause</button>
         <button id="btn-fullscreen" class="utility-btn" aria-label="Toggle fullscreen">⛶ Fullscreen</button>
       </section>
 
