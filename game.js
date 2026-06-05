@@ -7,8 +7,10 @@ const continuesLabelEl = document.getElementById("continues-label");
 const levelSelectEl = document.getElementById("level-select");
 const levelListEl = document.getElementById("level-list");
 const closeLevelSelectEl = document.getElementById("close-level-select");
+const startDesktopBtn = document.getElementById("btn-start-desktop");
 const pauseDesktopBtn = document.getElementById("btn-pause-desktop");
 const fullscreenBtn = document.getElementById("btn-fullscreen");
+const audioBtn = document.getElementById("btn-audio");
 const summaryLevelEl = document.getElementById("summary-level");
 const summaryBonesEl = document.getElementById("summary-bones");
 const summaryPowerEl = document.getElementById("summary-power");
@@ -48,6 +50,7 @@ const AUDIO = {
   musicVol: 60, // 0-100
   sfxVol: 70, // 0-100
   musicPausedFactor: 0.25,
+  muted: false,
 };
 
 const GRAVITY = 0.7;
@@ -420,15 +423,20 @@ function renderLives() {
 
 function runSummaryGoal(level = levelRuntime) {
   if (state.mode === "start") return { text: "Press Space/Jump or tap to start.", tone: "start" };
-  if (state.mode === "title") return { text: `Collect ${state.totalBones} bones, then touch the flag.`, tone: "collect" };
-  if (state.mode === "paused") return { text: "Paused · Esc resumes.", tone: "paused" };
+  if (state.mode === "title") {
+    const bossName = level?.boss?.name;
+    return bossName
+      ? { text: `Collect ${state.totalBones} bones, defeat ${bossName}, then touch the flag.`, tone: "boss" }
+      : { text: `Collect ${state.totalBones} bones, then touch the flag.`, tone: "collect" };
+  }
+  if (state.mode === "paused") return { text: "Paused · Esc or PAUSE resumes.", tone: "paused" };
   if (state.mode === "celebrating") return { text: "Level clear! Next level loading…", tone: "clear" };
   if (state.mode === "dead") {
     return state.levelRespawnsLeft > 0
       ? { text: `Continue available · ${state.levelRespawnsLeft} left.`, tone: "warning" }
       : { text: "No continues left.", tone: "danger" };
   }
-  if (state.mode === "gameover") return { text: "Press Q, Enter, or Space to restart.", tone: "danger" };
+  if (state.mode === "gameover") return { text: "Press Q, Enter, Space, or tap ▲ to restart.", tone: "danger" };
   if (state.mode === "won") return { text: "All levels clear — press R or tap ▲ to play again.", tone: "clear" };
 
   const bonesLeft = Math.max(0, state.totalBones - state.bonesCollected);
@@ -585,6 +593,7 @@ function getImage(src) {
 let audioCtx = null;
 
 function musicVolume(paused = false) {
+  if (AUDIO.muted) return 0;
   const maxVol = 0.3;
   const base = (AUDIO.musicVol / 100) * maxVol;
   return paused ? base * AUDIO.musicPausedFactor : base;
@@ -630,7 +639,12 @@ function stopBgMusic() {
 }
 
 function setBgVolume(vol) {
-  if (bgMusic.audio) bgMusic.audio.volume = AUDIO.musicMuted ? 0 : vol;
+  if (bgMusic.audio) bgMusic.audio.volume = AUDIO.muted ? 0 : vol;
+}
+
+function toggleAudioMute() {
+  AUDIO.muted = !AUDIO.muted;
+  applyMusicVolume(state.mode === "paused");
 }
 
 function pauseGame() {
@@ -646,6 +660,44 @@ function resumeGame() {
   state.mode = "playing";
   applyMusicVolume(false);
   playPauseExitSound();
+}
+
+function cyclePauseSelection(direction = 1) {
+  if (state.mode !== "paused") return;
+  if (state.pauseMenu === "main") {
+    const opts = ["continue", "options"];
+    state.pauseOptionIndex = (state.pauseOptionIndex + opts.length + direction) % opts.length;
+    return;
+  }
+  if (state.pauseMenu === "options") {
+    const opts = ["music", "sfx"];
+    state.pauseOptionIndex = (state.pauseOptionIndex + opts.length + direction) % opts.length;
+  }
+}
+
+function adjustPauseOption(delta) {
+  if (state.mode !== "paused" || state.pauseMenu !== "options" || delta === 0) return;
+  const opts = ["music", "sfx"];
+  const key = opts[state.pauseOptionIndex] || "music";
+  if (key === "music") AUDIO.musicVol = Math.max(0, Math.min(100, AUDIO.musicVol + delta));
+  if (key === "sfx") AUDIO.sfxVol = Math.max(0, Math.min(100, AUDIO.sfxVol + delta));
+  applyMusicVolume(true);
+}
+
+function confirmPauseSelection() {
+  if (state.mode !== "paused") return;
+  if (state.pauseMenu === "main") {
+    if ((state.pauseOptionIndex || 0) === 1) {
+      state.pauseMenu = "options";
+      state.pauseOptionIndex = 0;
+    } else {
+      resumeGame();
+    }
+    return;
+  }
+  if (state.pauseMenu === "options") {
+    state.pauseMenu = "main";
+  }
 }
 
 function tone(freq = 440, ms = 120, type = "square", vol = 0.03, slideTo = null) {
@@ -739,6 +791,7 @@ function playDieSound() {
 }
 
 function sfxVolume(base = 1) {
+  if (AUDIO.muted) return 0;
   return base * (AUDIO.sfxVol / 100);
 }
 
@@ -953,7 +1006,7 @@ function takeHit(reasonText) {
 function continueRun() {
   if (state.levelRespawnsLeft <= 0) {
     state.mode = "gameover";
-    statusEl.textContent = "GAME OVER. Press Q to restart.";
+    statusEl.textContent = "GAME OVER. Press Q, Enter, or Space to restart. Touch: tap ▲ to restart.";
     return;
   }
   state.levelRespawnsLeft = Math.max(0, state.levelRespawnsLeft - 1);
@@ -2831,28 +2884,16 @@ function drawOverlay() {
       border: "rgba(76, 255, 136, 0.42)",
       color: "#ecfff0",
     });
-    drawStartPromptCard(canvas.height / 2 + 174, "▶ Press Space/Jump or tap to start");
-    drawCenteredChipRow(canvas.height / 2 + 224, ["Move: A/D or ←/→", "Jump: W / ↑ / Space", "Bark: F / K / Shift"], {
-      font: "15px 'Roboto', system-ui",
+    drawStartPromptCard(canvas.height / 2 + 188, "▶ Press Space/Jump or tap to start");
+    drawCenteredChipRow(canvas.height / 2 + 244, ["Mouse: Pause + Fullscreen below", "Secret: type HENRY"], {
+      font: "bold 14px 'Roboto', system-ui",
       paddingX: 12,
-      height: 30,
+      height: 28,
       gap: 10,
-      bg: "rgba(9, 22, 44, 0.82)",
-      border: "rgba(159, 229, 255, 0.45)",
-      color: "#f8fdff",
+      bg: "rgba(26, 18, 48, 0.84)",
+      border: "rgba(255, 184, 233, 0.36)",
+      color: "#ffe9f7",
     });
-    drawCenteredChipRow(canvas.height / 2 + 260, ["Restart: R", "Pause: Esc", "Touch: on-screen buttons + pause"], {
-      font: "15px 'Roboto', system-ui",
-      paddingX: 12,
-      height: 30,
-      gap: 10,
-      bg: "rgba(17, 34, 64, 0.8)",
-      border: "rgba(121, 225, 255, 0.3)",
-      color: "#dff8ff",
-    });
-    ctx.font = "bold 16px 'Roboto', system-ui";
-    ctx.fillStyle = "#ffd6f4";
-    ctx.fillText("Secret: type HENRY for the level-select portal", canvas.width / 2, canvas.height / 2 + 300);
     ctx.textAlign = "start";
     return;
   }
@@ -2929,7 +2970,10 @@ function drawOverlay() {
       });
       ctx.font = "17px 'Roboto', system-ui";
       ctx.fillStyle = "#d9fbff";
-      ctx.fillText("↑/↓ select • Enter confirm • Esc resume", canvas.width / 2, canvas.height / 2 + 104);
+      ctx.fillText("↑/↓ select • Enter confirm • Esc resume", canvas.width / 2, canvas.height / 2 + 98);
+      ctx.font = "15px 'Roboto', system-ui";
+      ctx.fillStyle = "#b8eef6";
+      ctx.fillText("Touch: ◀/▶ choose • ▲ confirm • PAUSE resume", canvas.width / 2, canvas.height / 2 + 122);
     } else {
       const musicSelected = state.pauseOptionIndex === 0;
       const sfxSelected = state.pauseOptionIndex === 1;
@@ -2937,7 +2981,10 @@ function drawOverlay() {
       drawPauseSlider(canvas.width / 2 - 110, canvas.height / 2 + 22, AUDIO.sfxVol, "SFX", sfxSelected);
       ctx.font = "17px 'Roboto', system-ui";
       ctx.fillStyle = "#d9fbff";
-      ctx.fillText("Enter: Save • Esc/B: Back • ←/→ adjust", canvas.width / 2, canvas.height / 2 + 62);
+      ctx.fillText("Enter: Save • Esc/B: Back • ←/→ adjust", canvas.width / 2, canvas.height / 2 + 54);
+      ctx.font = "15px 'Roboto', system-ui";
+      ctx.fillStyle = "#b8eef6";
+      ctx.fillText("Touch: BARK switches row • ◀/▶ adjust • ▲ save", canvas.width / 2, canvas.height / 2 + 78);
     }
     drawPauseSummaryCard(levelRuntime);
     ctx.textAlign = "start";
@@ -2968,11 +3015,14 @@ function drawOverlay() {
     ctx.fillStyle = "#fff";
     ctx.font = "bold 50px 'Flubby', 'Roboto', system-ui";
     ctx.textAlign = "center";
-    ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 20);
+    ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 30);
     ctx.font = "20px 'Roboto', 'Roboto', system-ui";
-    ctx.fillText(`Lives left: ${"🐶".repeat(Math.max(0, state.levelRespawnsLeft))}`, canvas.width / 2, canvas.height / 2 + 8);
-    ctx.fillText("Q / Enter / Space to restart", canvas.width / 2, canvas.height / 2 + 32);
-    drawDeadDog(canvas.width / 2, canvas.height / 2 + 80);
+    ctx.fillText("No continues left this run.", canvas.width / 2, canvas.height / 2 + 2);
+    ctx.fillText("Keyboard: Q / Enter / Space to restart", canvas.width / 2, canvas.height / 2 + 30);
+    ctx.font = "18px 'Roboto', 'Roboto', system-ui";
+    ctx.fillStyle = "#d9fbff";
+    ctx.fillText("Touch: tap ▲ to restart from the title screen", canvas.width / 2, canvas.height / 2 + 56);
+    drawDeadDog(canvas.width / 2, canvas.height / 2 + 102);
     ctx.textAlign = "start";
     return;
   }
@@ -3133,11 +3183,55 @@ function render() {
     pauseBtn.classList.toggle("paused", paused);
   }
 
+  if (startDesktopBtn) {
+    let label = "Run live";
+    let hint = "Run is already in progress";
+    let aria = "Run already in progress";
+    let disabled = true;
+
+    if (state.mode === "start") {
+      label = "Start run";
+      hint = "Start from the title screen without using the keyboard";
+      aria = "Start run from the title screen";
+      disabled = false;
+    } else if (state.mode === "paused") {
+      label = "Resume run";
+      hint = "Resume the paused run with a click";
+      aria = "Resume paused run";
+      disabled = false;
+    } else if (state.mode === "dead") {
+      label = "Continue";
+      hint = `Continue from faint state (${state.levelRespawnsLeft} left)`;
+      aria = "Continue after fainting";
+      disabled = false;
+    } else if (state.mode === "gameover") {
+      label = "Restart run";
+      hint = "Restart from Level 1 after game over";
+      aria = "Restart run after game over";
+      disabled = false;
+    }
+
+    startDesktopBtn.textContent = label;
+    startDesktopBtn.disabled = disabled;
+    startDesktopBtn.setAttribute("aria-label", aria);
+    const hintEl = startDesktopBtn.parentElement?.querySelector(".utility-btn-hint");
+    if (hintEl) hintEl.textContent = hint;
+  }
+
   if (pauseDesktopBtn) {
     const paused = state.mode === "paused";
     pauseDesktopBtn.textContent = paused ? "Resume" : "Pause";
     pauseDesktopBtn.classList.toggle("paused", paused);
     pauseDesktopBtn.setAttribute("aria-label", paused ? "Resume game" : "Pause game");
+  }
+
+  if (audioBtn) {
+    const muted = AUDIO.muted;
+    audioBtn.textContent = muted ? "🔇 Audio off" : "🔊 Audio on";
+    audioBtn.classList.toggle("muted", muted);
+    audioBtn.setAttribute("aria-label", muted ? "Unmute game audio" : "Mute game audio");
+    const hintEl = audioBtn.parentElement?.querySelector(".utility-btn-hint");
+    if (hintEl) hintEl.textContent = muted ? "Click or press M to restore music and sound effects" : "Mute music and sound effects with one click or press M";
   }
 
   ctx.restore();
@@ -3171,6 +3265,12 @@ function setKey(code, value) {
 window.addEventListener("keydown", (e) => {
   if (e.code === "Escape" && state.levelSelectOpen) {
     closeLevelSelect();
+    return;
+  }
+
+  if (e.code === "KeyM") {
+    toggleAudioMute();
+    e.preventDefault();
     return;
   }
 
@@ -3337,8 +3437,36 @@ function bindHoldButton(id, onPress, onRelease = onPress) {
   btn.addEventListener("pointercancel", stop);
 }
 
-bindHoldButton("btn-left", (v) => (state.keys.left = v));
-bindHoldButton("btn-right", (v) => (state.keys.right = v));
+bindHoldButton(
+  "btn-left",
+  (v) => {
+    if (state.mode === "paused") {
+      if (!v) return;
+      if (state.pauseMenu === "options") adjustPauseOption(-5);
+      else cyclePauseSelection(-1);
+      return;
+    }
+    state.keys.left = v;
+  },
+  () => {
+    if (state.mode !== "paused") state.keys.left = false;
+  }
+);
+bindHoldButton(
+  "btn-right",
+  (v) => {
+    if (state.mode === "paused") {
+      if (!v) return;
+      if (state.pauseMenu === "options") adjustPauseOption(5);
+      else cyclePauseSelection(1);
+      return;
+    }
+    state.keys.right = v;
+  },
+  () => {
+    if (state.mode !== "paused") state.keys.right = false;
+  }
+);
 
 const jumpBtn = document.getElementById("btn-jump");
 jumpBtn.addEventListener("pointerdown", (e) => {
@@ -3350,6 +3478,8 @@ jumpBtn.addEventListener("pointerdown", (e) => {
     resetGame();
   } else if (state.mode === "dead") {
     continueRun();
+  } else if (state.mode === "paused") {
+    confirmPauseSelection();
   } else {
     state.keys.jump = true;
     state.jumpHeld = true;
@@ -3378,6 +3508,10 @@ if (barkBtn) {
       quitToStart();
       return;
     }
+    if (state.mode === "paused") {
+      cyclePauseSelection(1);
+      return;
+    }
     triggerSuperBark();
   });
 }
@@ -3391,6 +3525,22 @@ if (pauseBtn) {
       pauseGame();
     } else if (state.mode === "paused") {
       resumeGame();
+    }
+  });
+}
+
+if (startDesktopBtn) {
+  startDesktopBtn.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    startBgMusic();
+    if (state.mode === "start") {
+      startGame();
+    } else if (state.mode === "paused") {
+      resumeGame();
+    } else if (state.mode === "dead") {
+      continueRun();
+    } else if (state.mode === "gameover") {
+      quitToStart();
     }
   });
 }
@@ -3457,6 +3607,13 @@ if (fullscreenBtn) {
     updateLabel();
   });
   document.addEventListener("fullscreenchange", updateLabel);
+}
+
+if (audioBtn) {
+  audioBtn.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    toggleAudioMute();
+  });
 }
 
 startAfterFonts();

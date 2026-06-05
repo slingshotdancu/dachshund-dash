@@ -28,18 +28,81 @@
         <span id="summary-goal" class="summary-pill summary-pill-goal">Press Space/Jump or tap to start.</span>
       </section>
 
-      <section class="controls-help">
-        <strong>Desktop:</strong> Arrow keys / A,D to move, W / Up / Space to jump, Down Arrow / S to dive during cape flight, F / K / Right Shift to Super Bark, R to restart
-        <button id="btn-pause-desktop" class="utility-btn utility-btn-pause" aria-label="Pause or resume">Pause</button>
-        <button id="btn-fullscreen" class="utility-btn" aria-label="Toggle fullscreen">⛶ Fullscreen</button>
+      <section class="controls-help" aria-label="Desktop controls quick reference">
+        <strong class="controls-help-title">Desktop controls</strong>
+        <div class="controls-help-chips" role="list" aria-label="Desktop keyboard shortcuts">
+          <span class="control-chip" role="listitem"><span class="control-chip-label">Move</span> A / D or ← / →</span>
+          <span class="control-chip" role="listitem"><span class="control-chip-label">Jump</span> W / ↑ / Space</span>
+          <span class="control-chip" role="listitem"><span class="control-chip-label">Dive</span> S / ↓ during cape flight</span>
+          <span class="control-chip" role="listitem"><span class="control-chip-label">Bark</span> F / K / Right Shift</span>
+          <span class="control-chip" role="listitem"><span class="control-chip-label">Restart</span> R</span>
+          <span class="control-chip" role="listitem"><span class="control-chip-label">Pause</span> Esc</span>
+          <span class="control-chip" role="listitem"><span class="control-chip-label">Audio</span> M</span>
+        </div>
+        <div class="secret-code-callout" aria-label="Secret level select hint">
+          <strong class="secret-code-title">Secret shortcut</strong>
+          <span class="secret-code-text">Type <kbd>H</kbd><kbd>E</kbd><kbd>N</kbd><kbd>R</kbd><kbd>Y</kbd> to open level select from the title screen.</span>
+        </div>
+        <div class="utility-actions" aria-label="Desktop quick actions">
+          <strong class="utility-actions-title">Quick actions</strong>
+          <div class="utility-actions-buttons">
+            <div class="utility-action-group">
+              <button id="btn-start-desktop" class="utility-btn utility-btn-start" aria-label="Start run from the title screen">Start run</button>
+              <span class="utility-btn-hint">Mouse-friendly start, continue, and restart action</span>
+            </div>
+            <div class="utility-action-group">
+              <button id="btn-pause-desktop" class="utility-btn utility-btn-pause" aria-label="Pause or resume">Pause</button>
+              <span class="utility-btn-hint">Stop or resume a run without the keyboard</span>
+            </div>
+            <div class="utility-action-group">
+              <button id="btn-fullscreen" class="utility-btn" aria-label="Toggle fullscreen">⛶ Fullscreen</button>
+              <span class="utility-btn-hint">Stretch the playfield for distraction-free play</span>
+            </div>
+            <div class="utility-action-group">
+              <button id="btn-audio" class="utility-btn utility-btn-audio" aria-label="Mute game audio">🔊 Audio on</button>
+              <span class="utility-btn-hint">Mute music and sound effects with one click or <kbd>M</kbd></span>
+            </div>
+          </div>
+        </div>
       </section>
 
-      <section class="mobile-controls" aria-label="On-screen controls">
-        <button id="btn-left" aria-label="Move left">◀</button>
-        <button id="btn-jump" aria-label="Jump">▲</button>
-        <button id="btn-right" aria-label="Move right">▶</button>
-        <button id="btn-bark" aria-label="Super bark attack">BARK</button>
-        <button id="btn-pause" aria-label="Pause or resume">PAUSE</button>
+      <section class="mobile-controls-panel" aria-label="On-screen controls panel">
+        <div class="mobile-controls-heading">
+          <strong class="mobile-controls-title">On-screen controls</strong>
+          <span class="mobile-controls-subtitle">Clickable with a mouse on desktop and touch-friendly on phones.</span>
+        </div>
+        <div class="mobile-controls" aria-label="On-screen controls">
+          <div class="mobile-control-item">
+            <button id="btn-left" aria-label="Move left">◀</button>
+            <span class="mobile-control-caption">Left</span>
+          </div>
+          <div class="mobile-control-item">
+            <button id="btn-jump" aria-label="Jump">▲</button>
+            <span class="mobile-control-caption">Jump</span>
+          </div>
+          <div class="mobile-control-item">
+            <button id="btn-right" aria-label="Move right">▶</button>
+            <span class="mobile-control-caption">Right</span>
+          </div>
+          <div class="mobile-control-item mobile-control-item-wide">
+            <button id="btn-bark" aria-label="Super bark attack">BARK</button>
+            <span class="mobile-control-caption">Attack</span>
+          </div>
+          <div class="mobile-control-item mobile-control-item-wide">
+            <button id="btn-pause" aria-label="Pause or resume">PAUSE</button>
+            <span class="mobile-control-caption">Pause / resume</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="touch-help" aria-label="Touch controls quick reference">
+        <strong class="touch-help-title">Touch controls</strong>
+        <div class="touch-help-chips" role="list" aria-label="Touch controls quick reference chips">
+          <span class="control-chip touch-chip" role="listitem"><span class="control-chip-label">◀ / ▶</span> Move</span>
+          <span class="control-chip touch-chip" role="listitem"><span class="control-chip-label">▲</span> Jump · start · continue</span>
+          <span class="control-chip touch-chip" role="listitem"><span class="control-chip-label">BARK</span> Attack · quit in pause/game over</span>
+          <span class="control-chip touch-chip" role="listitem"><span class="control-chip-label">PAUSE</span> Pause · resume</span>
+        </div>
       </section>
 
       <section id="level-select" class="level-select hidden" aria-label="Cheat level select">

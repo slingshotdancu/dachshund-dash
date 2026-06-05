@@ -1,5 +1,140 @@
 # Dachshund Dash Changelog
 
+## 2026-06-04
+### Daily improvement: keyboard audio mute shortcut
+- Added a real desktop **`M` mute/unmute shortcut** so players can silence or restore the game instantly without reaching for the mouse or opening pause options.
+- Surfaced that shortcut directly in the visible desktop controls chips and in the audio quick-action helper copy, so the new shortcut is discoverable from the start screen.
+- Kept the change local to existing shell/audio controls, making it a safe quality-of-life polish pass.
+
+![Start screen showing the desktop Audio shortcut chip and updated audio quick-action hint](changelog/2026-06-04-keyboard-audio-shortcut.png)
+
+### Daily improvement: one-click desktop audio mute toggle
+- Added a visible **Audio on / Audio off** button to the desktop **Quick actions** card so players can silence the game immediately without opening the pause menu sliders first.
+- The button now updates its label, helper copy, and styling to reflect whether music and sound effects are currently muted.
+- Kept the change local to the shell UI plus existing audio helpers, making it a safe quality-of-life improvement for shared or quieter play sessions.
+
+![Start screen showing the new desktop audio toggle button in the Quick actions card](changelog/2026-06-04-desktop-audio-toggle.png)
+
+## 2026-06-03
+### Daily improvement: desktop start / continue / restart button
+- Added a dedicated **desktop primary action button** to the Quick actions card so mouse-first players can start a run, resume a pause, continue after a faint, or restart after game over without reaching for the keyboard.
+- The button now updates its label and helper copy with game state (**Start run**, **Resume run**, **Continue**, **Restart run**) and disables itself during active play so it stays truthful instead of behaving like a dead control.
+- Kept the change local to shell UI plus existing game-state transitions, making it a safe discoverability upgrade for desktop play.
+
+![Start screen showing the new desktop Start run button in the Quick actions card](changelog/2026-06-03-desktop-start-button.png)
+
+### Daily improvement: visible HENRY secret shortcut callout
+- Added a dedicated **Secret shortcut** callout beside the desktop controls so the hidden **HENRY** level-select unlock is actually discoverable from the title screen.
+- Styled each letter as a compact keyboard keycap, which makes the code easier to scan and remember without changing any gameplay logic.
+- Kept the change local to the shell UI, so it improves onboarding for curious players while leaving the game systems untouched.
+
+![Start screen showing the new Secret shortcut callout for the HENRY level-select code](changelog/2026-06-03-henry-secret-shortcut.png)
+
+## 2026-06-02
+### Daily improvement: on-screen control button captions
+- Added visible **caption labels beneath each on-screen button** so the arrow-only controls no longer rely on symbol recognition or hover/assistive text.
+- The bottom control row now spells out **Left**, **Jump**, **Right**, **Attack**, and **Pause / resume**, making the shell easier to understand for first-time desktop and touch players.
+- Kept the change purely presentational and local to the control panel, so it improves clarity without touching game logic.
+
+![Start screen showing the on-screen controls row with visible per-button captions](changelog/2026-06-02-onscreen-control-captions.png)
+
+### Daily improvement: labeled on-screen controls panel
+- Added a dedicated **On-screen controls** heading and helper caption above the bottom button row so those large buttons no longer read like unexplained floating UI.
+- The new subtitle makes it explicit that the controls are **clickable with a mouse on desktop** and still **touch-friendly on phones**, which improves first-run discoverability without changing gameplay.
+- Kept the change local to the shell UI, so it is easy to notice on the start screen and low-risk for the game itself.
+
+![Start screen showing the new on-screen controls heading and mouse/touch helper caption](changelog/2026-06-02-onscreen-controls-panel.png)
+
+## 2026-06-01
+### Daily improvement: start-screen footer hints
+- Added a compact **footer hint row** inside the start overlay so the most useful non-keyboard discoveries stay visible without bringing back the old wall of control chips.
+- The title screen now explicitly points desktop players to the **Pause** and **Fullscreen** buttons below the playfield, while keeping the **HENRY** secret discoverable in the same lightweight treatment.
+- Also nudged the main start prompt a bit higher so the bottom-of-canvas onboarding feels cleaner and less cramped.
+
+![Start screen showing the new footer hint row for mouse actions and the HENRY secret](changelog/2026-06-01-start-footer-hints.png)
+
+### Daily improvement: decluttered start overlay spacing
+- Simplified the **start overlay inside the playfield** so it no longer crams duplicated control rows into the canvas area.
+- Kept the key feature badges, level objective chips, start prompt, and **HENRY** secret visible, while relying on the existing shell controls reference below the canvas for the full input list.
+- This makes the title screen easier to scan and fixes the cut-off / overlapping lower overlay content without changing gameplay.
+
+![Start screen with the cleaner in-canvas overlay spacing and fully visible HENRY secret hint](changelog/2026-06-01-start-overlay-spacing.png)
+
+## 2026-05-31
+### Daily improvement: desktop quick action hints
+- Added short helper captions beneath the desktop **Pause** and **Fullscreen** buttons so mouse-first players can tell what those controls are for before starting a run.
+- The new copy makes it obvious that **Pause** can stop or resume play without the keyboard and that **Fullscreen** is the distraction-free view.
+- Kept the change lightweight and purely presentational, building on the quick-actions card without changing any controls or game logic.
+
+![Start screen showing the desktop Quick actions card with new Pause and Fullscreen helper captions](changelog/2026-05-31-quick-actions-hints.png)
+
+### Daily improvement: desktop quick actions card
+- Grouped the desktop **Pause** and **Fullscreen** buttons into a dedicated **Quick actions** card so they no longer feel visually detached from the keyboard help row.
+- Added a small label, shared panel styling, and tighter button grouping to make those utility controls easier to spot before a run starts.
+- Kept the change purely presentational, so it improves discoverability without changing any game behavior or inputs.
+
+![Start screen showing the new Quick actions card grouping the Pause and Fullscreen buttons](changelog/2026-05-31-quick-actions-card.png)
+
+## 2026-05-30
+### Daily improvement: pause summary resume hint now includes touch
+- Updated the **paused run-summary goal pill** so it no longer reads like a keyboard-only instruction.
+- The pill now says **“Paused · Esc or PAUSE resumes.”**, which matches the actual mobile and desktop resume paths already available in the shell.
+- This keeps the pause-state guidance consistent with the newer touch-friendly controls instead of teaching only the Esc key.
+
+![Paused gameplay showing the run summary pill now mentioning both Esc and the PAUSE button to resume](changelog/2026-05-30-pause-summary-resume-hint.png)
+
+### Daily improvement: start goal pill call-to-action styling
+- Gave the **run summary goal pill** a dedicated **start-state treatment** so the landing-page prompt reads like the primary action instead of blending into the other status chips.
+- The **“Press Space/Jump or tap to start”** pill now uses a brighter blue gradient, stronger border contrast, and a gentle pulse that makes the start instruction easier to spot at a glance.
+- This stays purely presentational, so it improves the first-run read without changing any gameplay or controls.
+
+![Landing page showing the run summary start prompt pill with brighter call-to-action styling](changelog/2026-05-30-start-goal-pill-highlight.png)
+
+## 2026-05-29
+### Daily improvement: mobile touch controls quick reference
+- Added a **Touch controls** help strip beneath the on-screen buttons on small screens, so phone players can see what each control does without guessing mid-run.
+- The new chips call out that **▲** handles **jump / start / continue**, **BARK** is used for **attacks** and some **quit** flows, and **PAUSE** can both **pause** and **resume**.
+- Kept it mobile-only so the extra guidance appears where it matters without adding clutter to the desktop layout.
+
+![Mobile viewport showing the new touch controls quick reference chips beneath the on-screen buttons](changelog/2026-05-29-touch-controls-quick-reference.png)
+
+### Daily improvement: visible keyboard focus ring for controls
+- Added a clear **focus-visible highlight** to the shell buttons and touch controls so keyboard players can immediately tell which control is selected while tabbing.
+- The **Pause**, **Fullscreen**, mobile control buttons, and level-select buttons now get the same cyan outline and glow, which makes the page feel more intentional and accessible without changing gameplay.
+- This is especially useful on the title screen and around pause/fullscreen actions, where the game already exposes real page buttons outside the canvas.
+
+![Keyboard focus highlight visible on the Pause button in the game shell](changelog/2026-05-29-button-focus-ring.png)
+
+## 2026-05-28
+### Daily improvement: touch-friendly pause menu controls
+- Closed a real mobile pause-menu gap: touch players can now actually **navigate and use** the pause menu instead of only pausing and resuming.
+- On the main pause screen, **◀/▶** now switch between **Continue** and **Options**, **▲** confirms the current choice, and the overlay teaches that **PAUSE** resumes immediately.
+- Inside pause options, **BARK** switches between the Music and SFX rows, **◀/▶** adjusts the selected slider, and **▲** saves back to the main pause menu.
+
+![Paused options overlay showing the new touch pause-menu controls guidance](changelog/2026-05-28-pause-touch-menu-controls.png)
+
+### Daily improvement: game-over touch restart guidance
+- Clarified the **GAME OVER** overlay so it no longer looks keyboard-only once a run is out of continues.
+- The screen now explicitly says **no continues are left**, keeps the **keyboard restart** keys visible, and adds a dedicated **touch restart** line for tapping **▲**.
+- Also synced the run-summary restart hint and game-over status copy to mention the same touch restart path, so the messaging stays consistent across the page.
+
+![Game over overlay showing both keyboard restart keys and the new touch restart guidance](changelog/2026-05-28-game-over-touch-restart.png)
+
+## 2026-05-27
+### Daily improvement: boss intro summary goal copy
+- Fixed the **run summary goal pill** on boss-level intro screens so it no longer implies the flag is enough once players leave the title overlay.
+- Levels 10 and 20 now explicitly say players must **collect the bones**, **defeat the boss**, and **then touch the flag**, matching the real win condition already used elsewhere.
+- This keeps the summary strip truthful during the exact moment players are deciding what the level expects before they start moving.
+
+![Level 10 intro showing the run summary goal pill now calling out bones, boss defeat, and the flag](changelog/2026-05-27-boss-intro-summary-goal.png)
+
+### Daily improvement: desktop controls shortcut chips
+- Replaced the dense **desktop controls** sentence below the canvas with a quick-scan strip of **shortcut chips** for Move, Jump, Dive, Bark, Restart, and Pause.
+- This keeps the keyboard help visible but makes it much easier to read at a glance before starting a run or after a quick reset.
+- Kept the existing **Pause** and **Fullscreen** utility buttons in place so the layout is clearer without changing gameplay behavior.
+
+![Desktop controls quick reference restyled as readable shortcut chips below the game canvas](changelog/2026-05-27-desktop-controls-shortcuts.png)
+
 ## 2026-05-26
 ### Daily improvement: pause snapshot boss status
 - Expanded the **pause snapshot card** on boss stages so it now shows the live boss objective instead of dropping that context the moment players pause.

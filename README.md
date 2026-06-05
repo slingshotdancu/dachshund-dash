@@ -35,6 +35,8 @@ npx serve .
   - Super Jump: first jump is always normal; keep holding jump in-air to trigger one higher boost
   - Dive while flying: `S` or `Down Arrow`
   - Super Bark attack: `F`, `K`, or `Right Shift` (with bark SFX)
+  - Pause / resume: `Esc` or `P`
+  - Mute / unmute audio: `M`
   - Restart: `R`
   - Cheat code: type `henry` to open level-select screen + unlock effect
 - **Mobile / touch**
