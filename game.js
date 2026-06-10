@@ -422,14 +422,14 @@ function renderLives() {
 }
 
 function runSummaryGoal(level = levelRuntime) {
-  if (state.mode === "start") return { text: "Press Space/Jump or tap to start.", tone: "start" };
+  if (state.mode === "start") return { text: "Press Enter, Space, W, ↑, or tap ▲ to start.", tone: "start" };
   if (state.mode === "title") {
     const bossName = level?.boss?.name;
     return bossName
       ? { text: `Collect ${state.totalBones} bones, defeat ${bossName}, then touch the flag.`, tone: "boss" }
       : { text: `Collect ${state.totalBones} bones, then touch the flag.`, tone: "collect" };
   }
-  if (state.mode === "paused") return { text: "Paused · Esc or PAUSE resumes.", tone: "paused" };
+  if (state.mode === "paused") return { text: "Paused · P, Esc, or PAUSE resumes.", tone: "paused" };
   if (state.mode === "celebrating") return { text: "Level clear! Next level loading…", tone: "clear" };
   if (state.mode === "dead") {
     return state.levelRespawnsLeft > 0
@@ -480,10 +480,22 @@ function runSummaryPower(level = levelRuntime) {
   return { text: parts.join(" · "), tone };
 }
 
+function levelProgressPercent() {
+  const current = Math.min(LEVELS.length, Math.max(1, (state.currentLevelIndex || 0) + 1));
+  return Math.max(0, Math.min(100, (current / LEVELS.length) * 100));
+}
+
+function runSummaryLevelText(level = levelRuntime) {
+  const current = Math.min(LEVELS.length, Math.max(1, (state.currentLevelIndex || 0) + 1));
+  const bossTag = level?.boss ? " · Boss" : "";
+  return `Level ${current} of ${LEVELS.length}${bossTag}`;
+}
+
 function renderRunSummary(level = levelRuntime) {
   if (summaryLevelEl) {
-    summaryLevelEl.textContent = level?.name || "Level 1";
+    summaryLevelEl.textContent = runSummaryLevelText(level);
     summaryLevelEl.dataset.tone = state.mode === "paused" ? "paused" : "level";
+    summaryLevelEl.style.setProperty("--summary-progress", `${levelProgressPercent()}%`);
   }
 
   if (summaryBonesEl) {
@@ -544,7 +556,7 @@ function goToStartScreen() {
   levelRuntime = hydrateLevelRuntime(LEVELS[0]);
   resetPlayerPosition();
   renderLives();
-  statusEl.textContent = "Press Space/Jump or tap to start Dachshund Dash.";
+  statusEl.textContent = "Press Enter, Space, W, ↑, or tap ▲ to start Dachshund Dash.";
 }
 
 function openLevelSelect() {
@@ -563,7 +575,22 @@ function openLevelSelect() {
   LEVELS.forEach((lvl, idx) => {
     const btn = document.createElement("button");
     btn.className = "level-btn";
-    btn.textContent = `${idx + 1}`;
+
+    const levelLabel = document.createElement("span");
+    levelLabel.className = "level-btn-number";
+    levelLabel.textContent = `Level ${idx + 1}`;
+
+    const badges = [];
+    if (lvl.capes?.length) badges.push("Cape");
+    if (lvl.sirens?.length || lvl.toys?.length) badges.push("Toy");
+    if (lvl.boss) badges.push("Boss");
+
+    const meta = document.createElement("span");
+    meta.className = "level-btn-meta";
+    meta.textContent = badges.length ? badges.join(" • ") : "Standard run";
+
+    btn.append(levelLabel, meta);
+    btn.setAttribute("aria-label", `${lvl.name}${badges.length ? `, ${badges.join(", ")}` : ""}`);
     btn.addEventListener("click", () => {
       closeLevelSelect();
       loadLevel(idx, { resetLives: true });
@@ -1356,7 +1383,7 @@ function drawLevelPreviewCard(x, y, level) {
   ctx.fillStyle = "#eafcff";
   ctx.font = "bold 13px 'Roboto', system-ui";
   ctx.textAlign = "center";
-  ctx.fillText("▶ Press Space, Jump, or tap ▲ to start this level", x + width / 2, promptY + promptH / 2 + 1);
+  ctx.fillText("▶ Press Enter, Space, W, ↑, or tap ▲ to start this level", x + width / 2, promptY + promptH / 2 + 1);
   ctx.restore();
 }
 
@@ -2764,22 +2791,31 @@ function drawPauseMenuOption(x, y, w, h, label, subtitle, selected) {
   ctx.restore();
 }
 
-function drawPauseSummaryCard(level) {
-  const cooldownLeft = Math.max(0, state.combat.barkCooldownUntil - Date.now());
-  const capeLeft = Math.max(0, state.capeUntil - Date.now());
-  const bossLine = level?.boss
+function buildBossSnapshotLine(level) {
+  return level?.boss
     ? level.boss.dead
       ? `Boss: ${level.boss.name} defeated • flag ready when bones are done`
       : `Boss: ${level.boss.name} ${Math.max(0, level.boss.health)}/${level.boss.maxHealth}`
     : "";
+}
+
+function drawRunSnapshotCard(level, options = {}) {
+  const cooldownLeft = Math.max(0, state.combat.barkCooldownUntil - Date.now());
+  const capeLeft = Math.max(0, state.capeUntil - Date.now());
+  const bossLine = buildBossSnapshotLine(level);
+  const title = options.title || `${level.name} snapshot`;
+  const footer = options.footer || "";
+  const accent = options.accent || "rgba(159, 229, 255, 0.32)";
+  const y = options.y ?? canvas.height / 2 + 42;
+  const showAbilities = options.showAbilities !== false;
   const cardW = 370;
-  const cardH = bossLine ? 146 : 120;
+  const extraLines = (showAbilities ? 1 : 0) + (bossLine ? 1 : 0) + (footer ? 1 : 0);
+  const cardH = 74 + extraLines * 24;
   const x = canvas.width / 2 - cardW / 2;
-  const y = canvas.height / 2 + 42;
 
   ctx.save();
   ctx.fillStyle = "rgba(7, 18, 36, 0.82)";
-  ctx.strokeStyle = "rgba(159, 229, 255, 0.32)";
+  ctx.strokeStyle = accent;
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.roundRect(x, y, cardW, cardH, 16);
@@ -2789,23 +2825,37 @@ function drawPauseSummaryCard(level) {
   ctx.textAlign = "left";
   ctx.fillStyle = "#f8fdff";
   ctx.font = "bold 18px 'Roboto', system-ui";
-  ctx.fillText(`${level.name} snapshot`, x + 16, y + 26);
+  ctx.fillText(title, x + 16, y + 26);
 
   ctx.font = "15px 'Roboto', system-ui";
   ctx.fillStyle = "#d9fbff";
   ctx.fillText(`Bones: ${state.bonesCollected}/${state.totalBones}`, x + 16, y + 52);
   ctx.fillText(`Lives: ${state.lives}/${MAX_LIVES} • Continues: ${state.levelRespawnsLeft}`, x + 16, y + 74);
 
-  const barkText = cooldownLeft > 0 ? `recharging ${Math.ceil(cooldownLeft / 1000)}s` : "ready";
-  const capeText = capeLeft > 0 ? `active ${Math.ceil(capeLeft / 1000)}s` : "inactive";
-  ctx.fillText(`Super Bark: ${barkText}`, x + 16, y + 98);
-  ctx.fillText(`Cape: ${capeText}`, x + 188, y + 98);
+  let lineY = y + 98;
+  if (showAbilities) {
+    const barkText = cooldownLeft > 0 ? `recharging ${Math.ceil(cooldownLeft / 1000)}s` : "ready";
+    const capeText = capeLeft > 0 ? `active ${Math.ceil(capeLeft / 1000)}s` : "inactive";
+    ctx.fillText(`Super Bark: ${barkText}`, x + 16, lineY);
+    ctx.fillText(`Cape: ${capeText}`, x + 188, lineY);
+    lineY += 24;
+  }
 
   if (bossLine) {
     ctx.fillStyle = level.boss.dead ? "#dfffea" : "#ffe6d8";
-    ctx.fillText(bossLine, x + 16, y + 122);
+    ctx.fillText(bossLine, x + 16, lineY);
+    lineY += 24;
+  }
+
+  if (footer) {
+    ctx.fillStyle = "#bfefff";
+    ctx.fillText(footer, x + 16, lineY);
   }
   ctx.restore();
+}
+
+function drawPauseSummaryCard(level) {
+  drawRunSnapshotCard(level, { title: `${level.name} snapshot` });
 }
 
 function drawLogo(x, y, scale = 0.5) {
@@ -2884,8 +2934,8 @@ function drawOverlay() {
       border: "rgba(76, 255, 136, 0.42)",
       color: "#ecfff0",
     });
-    drawStartPromptCard(canvas.height / 2 + 188, "▶ Press Space/Jump or tap to start");
-    drawCenteredChipRow(canvas.height / 2 + 244, ["Mouse: Pause + Fullscreen below", "Secret: type HENRY"], {
+    drawStartPromptCard(canvas.height / 2 + 188, "▶ Press Enter, Space, W, ↑, or tap ▲ to start");
+    drawCenteredChipRow(canvas.height / 2 + 244, ["Pause anytime: P / Esc or the button below", "Secret: type HENRY"], {
       font: "bold 14px 'Roboto', system-ui",
       paddingX: 12,
       height: 28,
@@ -2970,7 +3020,7 @@ function drawOverlay() {
       });
       ctx.font = "17px 'Roboto', system-ui";
       ctx.fillStyle = "#d9fbff";
-      ctx.fillText("↑/↓ select • Enter confirm • Esc resume", canvas.width / 2, canvas.height / 2 + 98);
+      ctx.fillText("↑/↓ select • Enter confirm • P/Esc resume", canvas.width / 2, canvas.height / 2 + 98);
       ctx.font = "15px 'Roboto', system-ui";
       ctx.fillStyle = "#b8eef6";
       ctx.fillText("Touch: ◀/▶ choose • ▲ confirm • PAUSE resume", canvas.width / 2, canvas.height / 2 + 122);
@@ -2997,14 +3047,20 @@ function drawOverlay() {
     ctx.fillStyle = "#fff";
     ctx.font = "bold 44px 'Flubby', 'Roboto', system-ui";
     ctx.textAlign = "center";
-    ctx.fillText("YOU FAINTED", canvas.width / 2, canvas.height / 2 - 40);
+    ctx.fillText("YOU FAINTED", canvas.width / 2, canvas.height / 2 - 70);
     ctx.font = "20px 'Roboto', 'Roboto', system-ui";
-    ctx.fillText(`Lives left: ${"🐶".repeat(Math.max(0, state.levelRespawnsLeft))}`, canvas.width / 2, canvas.height / 2 - 10);
-    ctx.fillText(`C to Continue (${state.levelRespawnsLeft} left) • Q to Quit`, canvas.width / 2, canvas.height / 2 + 16);
+    ctx.fillText(`Lives left: ${"🐶".repeat(Math.max(0, state.levelRespawnsLeft))}`, canvas.width / 2, canvas.height / 2 - 42);
+    ctx.fillText(`C to Continue (${state.levelRespawnsLeft} left) • Q to Quit`, canvas.width / 2, canvas.height / 2 - 16);
     ctx.font = "18px 'Roboto', 'Roboto', system-ui";
     ctx.fillStyle = "#d9fbff";
-    ctx.fillText("Touch: tap ▲ to continue or BARK to quit", canvas.width / 2, canvas.height / 2 + 42);
-    drawDeadDog(canvas.width / 2, canvas.height / 2 + 92);
+    ctx.fillText("Touch: tap ▲ to continue or BARK to quit", canvas.width / 2, canvas.height / 2 + 10);
+    drawRunSnapshotCard(levelRuntime, {
+      title: `${levelRuntime.name} recovery snapshot`,
+      y: canvas.height / 2 + 32,
+      accent: "rgba(255, 205, 132, 0.36)",
+      footer: state.levelRespawnsLeft > 0 ? "Continue keeps this level progress. Quit returns to the title screen." : "No continues remain for this level."
+    });
+    drawDeadDog(canvas.width / 2, canvas.height / 2 + 196);
     ctx.textAlign = "start";
     return;
   }
@@ -3015,14 +3071,21 @@ function drawOverlay() {
     ctx.fillStyle = "#fff";
     ctx.font = "bold 50px 'Flubby', 'Roboto', system-ui";
     ctx.textAlign = "center";
-    ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 30);
+    ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 56);
     ctx.font = "20px 'Roboto', 'Roboto', system-ui";
-    ctx.fillText("No continues left this run.", canvas.width / 2, canvas.height / 2 + 2);
-    ctx.fillText("Keyboard: Q / Enter / Space to restart", canvas.width / 2, canvas.height / 2 + 30);
+    ctx.fillText("No continues left this run.", canvas.width / 2, canvas.height / 2 - 26);
+    ctx.fillText("Keyboard: Q / Enter / Space to restart", canvas.width / 2, canvas.height / 2);
     ctx.font = "18px 'Roboto', 'Roboto', system-ui";
     ctx.fillStyle = "#d9fbff";
-    ctx.fillText("Touch: tap ▲ to restart from the title screen", canvas.width / 2, canvas.height / 2 + 56);
-    drawDeadDog(canvas.width / 2, canvas.height / 2 + 102);
+    ctx.fillText("Touch: tap ▲ to restart from the title screen", canvas.width / 2, canvas.height / 2 + 26);
+    drawRunSnapshotCard(levelRuntime, {
+      title: `${levelRuntime.name} final snapshot`,
+      y: canvas.height / 2 + 48,
+      accent: "rgba(255, 159, 159, 0.36)",
+      footer: "Restart begins a fresh run from Level 1.",
+      showAbilities: false
+    });
+    drawDeadDog(canvas.width / 2, canvas.height / 2 + 200);
     ctx.textAlign = "start";
     return;
   }
@@ -3223,6 +3286,12 @@ function render() {
     pauseDesktopBtn.textContent = paused ? "Resume" : "Pause";
     pauseDesktopBtn.classList.toggle("paused", paused);
     pauseDesktopBtn.setAttribute("aria-label", paused ? "Resume game" : "Pause game");
+    const hintEl = pauseDesktopBtn.parentElement?.querySelector(".utility-btn-hint");
+    if (hintEl) {
+      hintEl.innerHTML = paused
+        ? "Resume the run with a click or press <kbd>P</kbd> / <kbd>Esc</kbd>"
+        : "Stop or resume a run with a click or press <kbd>P</kbd> / <kbd>Esc</kbd>";
+    }
   }
 
   if (audioBtn) {

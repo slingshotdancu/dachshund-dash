@@ -1,5 +1,80 @@
 # Dachshund Dash Changelog
 
+## 2026-06-09
+### Daily improvement: Enter start shortcut discoverability
+- Surfaced **`Enter`** everywhere players look before a run starts: the desktop **Start** shortcut chip, the run-summary start prompt, the title-screen status text, and the level-intro start banner now all explicitly mention it.
+- This closes a small desktop onboarding gap, because the game already accepted **`Enter`** to begin a run but the visible shell only taught **Space / W / ↑ / tap ▲**.
+- Kept the change local to visible start-state copy, making it a safe clarity polish pass without changing gameplay behavior.
+
+![Start screen showing the Start shortcut chip and start prompt updated to include Enter](changelog/2026-06-09-enter-start-shortcut.png)
+
+### Daily improvement: faint-screen recovery shortcut callout
+- Added a visible **Recovery shortcuts** callout to the desktop help area so players can learn the **faint-screen** keyboard inputs before they need them.
+- The new helper explicitly teaches **`C` / `Enter` / `Space`** to continue and **`Q` / `Esc`** to quit, which closes a small discoverability gap in the run-recovery flow.
+- Kept the change local to the shell help UI, making it a safe clarity polish pass without changing gameplay behavior.
+
+![Start screen showing the new Recovery shortcuts callout for faint-screen continue and quit keys](changelog/2026-06-09-recovery-shortcuts-callout.png)
+
+## 2026-06-08
+### Daily improvement: touch restart shortcut chip
+- Updated the visible **touch controls** help so the **`▲`** chip now explicitly says **Jump · start · continue · restart**.
+- This closes a small mobile onboarding gap: touch players could already restart with **▲** after a loss or full clear, but the start-screen shortcut row stopped at **continue**.
+- Kept the change local to the shell help copy, making it a safe discoverability polish pass without changing gameplay behavior.
+
+![Start screen showing the touch ▲ shortcut chip updated to include restart](changelog/2026-06-08-touch-restart-chip.png)
+
+### Daily improvement: pause shortcut discoverability
+- Surfaced the keyboard **pause/resume shortcut** everywhere players look first: the desktop controls chips, the title-screen helper badge, the paused-state summary text, and the desktop pause button helper copy now all call out **`P`** alongside **`Esc`**.
+- This closes a small but real onboarding gap, because the game already supported **`P`** in-play but the visible shell mostly implied **`Esc`** was the only keyboard pause key.
+- Kept the change local to UI copy and existing state text, making it a safe clarity polish pass without changing gameplay behavior.
+
+![Start screen showing the newly surfaced P / Esc pause shortcut in the helper badge, controls chips, and quick action hint](changelog/2026-06-08-pause-shortcut-discoverability.png)
+
+## 2026-06-07
+### Daily improvement: desktop start shortcut chip
+- Added a dedicated **Start** chip to the desktop controls quick-reference row so the title screen explicitly teaches which keyboard inputs begin a run.
+- This removes the need to infer that **Jump** also starts the game, making the first action clearer for new desktop players.
+- Kept the change local to visible shell help copy, making it a safe onboarding polish pass.
+
+![Start screen showing the new desktop Start shortcut chip beside the other keyboard control chips](changelog/2026-06-07-desktop-start-shortcut-chip.png)
+
+### Daily improvement: clearer start prompt controls
+- Reworded the title-screen and start-state prompt copy to spell out the actual start inputs: **Space**, **W**, **↑**, or touch **▲**.
+- This removes the vague **“Jump”** wording, so first-time players can tell exactly which keyboard keys will begin the run.
+- Kept the change local to prompt text only, making it a safe onboarding clarity pass.
+
+![Start screen showing the clearer start prompt with explicit Space, W, Up Arrow, and touch ▲ controls](changelog/2026-06-07-clearer-start-prompt.png)
+
+## 2026-06-06
+### Daily improvement: level-select special-stage tags
+- Upgraded the hidden **HENRY** level-select grid from number-only buttons to clearer **Level N** cards with small stage-type tags.
+- Special runs now preview whether a level includes a **Cape**, **Toy**, or **Boss**, so cheat-starting later levels is much easier to scan without opening them first.
+- Kept the change local to the secret level-select UI, making it a safe discoverability polish pass without touching gameplay.
+
+![HENRY level-select screen showing Level cards with Cape, Toy, and Boss tags](changelog/2026-06-06-level-select-special-tags.png)
+
+### Daily improvement: faint-screen recovery snapshot card
+- Added a compact **recovery snapshot** card to the **YOU FAINTED** overlay so players can immediately see bones collected, hearts, continues, ability state, and boss HP before deciding whether to continue or quit.
+- The full **GAME OVER** screen now reuses that same snapshot treatment with a restart-focused footer, keeping the run summary visible right at the failure decision point instead of dropping players into a mostly empty overlay.
+- Kept the change local to overlay presentation, making it a safe clarity polish pass without altering combat or progression rules.
+
+![Faint overlay showing the new recovery snapshot card with run progress and boss status](changelog/2026-06-06-faint-recovery-snapshot.png)
+
+## 2026-06-05
+### Daily improvement: visual campaign progress fill in the level pill
+- Turned the run-summary **level pill** into a lightweight campaign progress indicator by adding a fill bar that grows with the current level.
+- Players can now read both the **`Level X of 20`** text and the visual sense of how far through the run they are, without opening menus or relying on the in-canvas action.
+- Kept the change local to the shell summary UI, making it a safe presentation polish pass.
+
+![Run summary showing the level pill with a visible campaign progress fill](changelog/2026-06-05-level-progress-fill-pill.png)
+
+### Daily improvement: clearer level progress pill
+- Updated the run-summary **level pill** to show full campaign progress as **`Level X of 20`** instead of only the current level name.
+- Boss stages now add a compact **Boss** tag in that same pill, so players can tell at a glance where they are in the overall run.
+- Kept the change local to the summary text, making it a safe clarity upgrade without changing gameplay.
+
+![Run summary showing the clearer Level 1 of 20 progress pill](changelog/2026-06-05-level-progress-pill.png)
+
 ## 2026-06-04
 ### Daily improvement: keyboard audio mute shortcut
 - Added a real desktop **`M` mute/unmute shortcut** so players can silence or restore the game instantly without reaching for the mouse or opening pause options.

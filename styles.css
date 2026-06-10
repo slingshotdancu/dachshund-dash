@@ -135,6 +135,9 @@ h1 {
 }
 
 .summary-pill {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   display: inline-flex;
   align-items: center;
   min-height: 36px;
@@ -152,6 +155,17 @@ h1 {
     color 140ms ease,
     box-shadow 140ms ease,
     transform 140ms ease;
+}
+
+.summary-pill::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: var(--summary-progress, 0%);
+  background: linear-gradient(90deg, rgba(121, 225, 255, 0.2), rgba(121, 225, 255, 0.08));
+  z-index: -1;
+  pointer-events: none;
+  transition: width 180ms ease;
 }
 
 .summary-pill[data-tone="level"] {
@@ -246,16 +260,20 @@ h1 {
   gap: 0.45rem;
 }
 
-.secret-code-callout {
+.secret-code-callout,
+.recovery-shortcut-callout {
   display: inline-flex;
   align-items: center;
   gap: 0.65rem;
   flex-wrap: wrap;
   padding: 0.55rem 0.8rem;
   border-radius: 14px;
+  box-shadow: inset 0 1px 0 rgba(255, 245, 220, 0.06);
+}
+
+.secret-code-callout {
   border: 1px solid rgba(255, 214, 140, 0.32);
   background: linear-gradient(180deg, rgba(56, 38, 17, 0.92), rgba(35, 24, 11, 0.88));
-  box-shadow: inset 0 1px 0 rgba(255, 245, 220, 0.06);
 }
 
 .secret-code-title {
@@ -271,7 +289,26 @@ h1 {
   line-height: 1.4;
 }
 
-.secret-code-callout kbd {
+.recovery-shortcut-callout {
+  border: 1px solid rgba(168, 231, 255, 0.28);
+  background: linear-gradient(180deg, rgba(12, 32, 58, 0.94), rgba(10, 23, 42, 0.9));
+}
+
+.recovery-shortcut-title {
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #d9f6ff;
+}
+
+.recovery-shortcut-text {
+  color: #eefbff;
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
+.secret-code-callout kbd,
+.recovery-shortcut-callout kbd {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -672,8 +709,8 @@ h1 {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
-  gap: 0.45rem;
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  gap: 0.55rem;
 }
 
 .level-btn,
@@ -688,7 +725,43 @@ h1 {
 }
 
 .level-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.22rem;
+  min-height: 70px;
+  text-align: left;
   animation: henryButtonGlow 1.4s ease-in-out infinite;
+}
+
+.level-btn-number {
+  font-size: 1rem;
+  line-height: 1.1;
+}
+
+.level-btn-meta {
+  font-size: 0.7rem;
+  line-height: 1.25;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(222, 241, 255, 0.78);
+}
+
+.level-btn[aria-label*="Boss"] .level-btn-meta {
+  color: #ffd8aa;
+}
+
+.level-btn[aria-label*="Cape"] .level-btn-meta {
+  text-shadow: 0 0 10px rgba(115, 234, 181, 0.18);
+}
+
+.level-btn[aria-label*="Toy"] .level-btn-meta {
+  text-shadow: 0 0 10px rgba(121, 225, 255, 0.18);
+}
+
+.level-btn[aria-label*="Boss"][aria-label*="Cape"] .level-btn-meta,
+.level-btn[aria-label*="Boss"][aria-label*="Toy"] .level-btn-meta {
+  color: #ffe7bf;
 }
 
 .level-btn:hover,
@@ -701,6 +774,16 @@ h1 {
   z-index: 1;
   margin-top: 0.8rem;
   width: 100%;
+}
+
+@media (max-width: 640px) {
+  .level-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .level-btn {
+    min-height: 64px;
+  }
 }
 
 @keyframes henryBorderSpin {
@@ -764,6 +847,7 @@ h1 {
   .controls-help-title,
   .controls-help-chips,
   .secret-code-callout,
+  .recovery-shortcut-callout,
   .utility-actions,
   .mobile-controls-heading,
   .touch-help-title,
@@ -806,7 +890,8 @@ h1 {
     text-align: center;
   }
 
-  .secret-code-callout {
+  .secret-code-callout,
+  .recovery-shortcut-callout {
     justify-content: center;
     text-align: center;
   }
