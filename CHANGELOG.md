@@ -1,5 +1,37 @@
 # Dachshund Dash Changelog
 
+## 2026-06-11
+### Practice update 1: start screen text cut way back
+- Trimmed the start/title presentation so it stays mostly visual instead of reading-heavy.
+- Removed the bulky helper copy around the shell, hid the status/run-summary text on the start screen, and shortened the in-canvas prompts to just a few words.
+- Kept the core buttons and touch controls visible so the game still starts cleanly without turning the screen into a wall of text.
+
+![Minimal start screen with much lighter text and the visual-first title presentation](changelog/2026-06-11-start-screen-minimal.png)
+
+### Practice update 2: real underwater swim level
+- Turned the opening water-themed stage into a true underwater level with buoyant swim physics, drag, lift, bubbles, light rays, and kelp silhouettes.
+- Henry now glides through the stage instead of moving like a normal land jump level, which gives the first environment a clearly different feel right away.
+
+![Underwater level showing buoyant swim movement, bubbles, and the new ocean backdrop](changelog/2026-06-11-underwater-level.png)
+
+### Practice update 3: moon gravity level
+- Added a moon stage with low gravity, a space sky, stars, a moon backdrop, and floatier jumps.
+- The lower-gravity physics change the rhythm of the level without needing extra on-screen explanation.
+
+![Moon level showing the low-gravity space backdrop and floatier platforming feel](changelog/2026-06-11-moon-level.png)
+
+### Practice update 4: giant enemy level
+- Added a level variant where the corgi enemies are comically oversized but still go down in the normal way.
+- Also gave the stage a hotter sunset palette so the “big corgis” run reads differently at a glance.
+
+![Giant enemy level showing oversized corgis filling much more of the play space](changelog/2026-06-11-giant-enemy-level.png)
+
+### Practice update 5: dark spotlight level with light switches
+- Added a dark level that limits visibility to Henry’s spotlight until he reaches light switches placed through the stage.
+- Switched-on lights carve out extra safe visibility pockets, so the mechanic reads visually instead of through tutorial text.
+
+![Dark level showing Henry’s spotlight cone and switch-powered light pockets](changelog/2026-06-11-dark-switch-level.png)
+
 ## 2026-06-10
 ### Daily improvement: desktop game-over restart button now truly restarts
 - Fixed a real UX mismatch in the desktop **Quick actions** card: when the game-over state surfaced a **Restart run** button, clicking it used to send players back to the title flow instead of actually restarting the run.

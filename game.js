@@ -334,6 +334,18 @@ if (LEVELS[5] && LEVELS[5].platforms && LEVELS[5].platforms[1]) {
   LEVELS[5].platforms[1].y = 392;
 }
 
+// Practice pass: add more visual/gameplay variety with less on-screen reading.
+if (LEVELS[1]) LEVELS[1].moon = true;
+if (LEVELS[2]) LEVELS[2].giantEnemies = true;
+if (LEVELS[3]) {
+  LEVELS[3].dark = true;
+  LEVELS[3].lightSwitches = [
+    { x: 760, y: 398, w: 26, h: 42, on: false },
+    { x: 1640, y: 340, w: 26, h: 42, on: false },
+    { x: 2480, y: 282, w: 26, h: 42, on: false },
+  ];
+}
+
 const state = {
   mode: "start",
   currentLevelIndex: 0,
@@ -422,39 +434,29 @@ function renderLives() {
 }
 
 function runSummaryGoal(level = levelRuntime) {
-  if (state.mode === "start") return { text: "Press Enter, Space, W, ↑, or tap ▲ to start.", tone: "start" };
+  if (state.mode === "start") return { text: "Press Start", tone: "start" };
   if (state.mode === "title") {
-    const bossName = level?.boss?.name;
-    return bossName
-      ? { text: `Collect ${state.totalBones} bones, defeat ${bossName}, then touch the flag.`, tone: "boss" }
-      : { text: `Collect ${state.totalBones} bones, then touch the flag.`, tone: "collect" };
+    return level?.boss ? { text: "Bones · Boss · Flag", tone: "boss" } : { text: "Bones · Flag", tone: "collect" };
   }
-  if (state.mode === "paused") return { text: "Paused · P, Esc, or PAUSE resumes.", tone: "paused" };
-  if (state.mode === "celebrating") return { text: "Level clear! Next level loading…", tone: "clear" };
+  if (state.mode === "paused") return { text: "Paused", tone: "paused" };
+  if (state.mode === "celebrating") return { text: "Level clear", tone: "clear" };
   if (state.mode === "dead") {
-    return state.levelRespawnsLeft > 0
-      ? { text: `Continue available · ${state.levelRespawnsLeft} left.`, tone: "warning" }
-      : { text: "No continues left.", tone: "danger" };
+    return state.levelRespawnsLeft > 0 ? { text: `Continue · ${state.levelRespawnsLeft}`, tone: "warning" } : { text: "No retry", tone: "danger" };
   }
-  if (state.mode === "gameover") return { text: "Press Q, Enter, Space, or tap ▲ to restart.", tone: "danger" };
-  if (state.mode === "won") return { text: "All levels clear — press R or tap ▲ to play again.", tone: "clear" };
+  if (state.mode === "gameover") return { text: "Restart", tone: "danger" };
+  if (state.mode === "won") return { text: "You win", tone: "clear" };
 
   const bonesLeft = Math.max(0, state.totalBones - state.bonesCollected);
-  if (bonesLeft > 0) {
-    return {
-      text: bonesLeft === 1 ? "Collect 1 more bone." : `Collect ${bonesLeft} more bones.`,
-      tone: "collect",
-    };
-  }
-  if (level?.boss && !level.boss.dead) return { text: `Defeat ${level.boss.name}.`, tone: "boss" };
-  return { text: "Touch the flag.", tone: "ready" };
+  if (bonesLeft > 0) return { text: bonesLeft === 1 ? "1 bone" : `${bonesLeft} bones`, tone: "collect" };
+  if (level?.boss && !level.boss.dead) return { text: "Beat boss", tone: "boss" };
+  return { text: "Touch flag", tone: "ready" };
 }
 
 function runSummaryPower(level = levelRuntime) {
-  if (state.mode === "start") return { text: "Bark ready · Cape inactive", tone: "boost" };
-  if (state.mode === "paused") return { text: "Abilities frozen while paused.", tone: "paused" };
-  if (state.mode === "dead" || state.mode === "gameover") return { text: "Abilities reset on retry.", tone: "warning" };
-  if (state.mode === "won") return { text: "Champion lap unlocked. ✨", tone: "clear" };
+  if (state.mode === "start") return { text: "Bark · Cape", tone: "boost" };
+  if (state.mode === "paused") return { text: "Frozen", tone: "paused" };
+  if (state.mode === "dead" || state.mode === "gameover") return { text: "Reset", tone: "warning" };
+  if (state.mode === "won") return { text: "Champion ✨", tone: "clear" };
 
   const barkLeft = Math.max(0, state.combat.barkCooldownUntil - Date.now());
   const capeLeft = Math.max(0, state.capeUntil - Date.now());
@@ -474,7 +476,7 @@ function runSummaryPower(level = levelRuntime) {
   else tone = "warning";
 
   if (level?.boss && !level.boss.dead && !state.toyHeld && barkLeft <= 0) {
-    return { text: `${parts.join(" · ")} · Boss pressure on.`, tone: "boss" };
+    return { text: `${parts.join(" · ")} · Boss`, tone: "boss" };
   }
 
   return { text: parts.join(" · "), tone };
@@ -492,6 +494,12 @@ function runSummaryLevelText(level = levelRuntime) {
 }
 
 function renderRunSummary(level = levelRuntime) {
+  const summarySection = summaryLevelEl?.parentElement;
+  const hudSection = statusEl?.parentElement;
+  const shellTextHidden = state.mode === "start";
+  if (summarySection) summarySection.style.display = shellTextHidden ? "none" : "flex";
+  if (hudSection) hudSection.style.display = shellTextHidden ? "none" : "flex";
+
   if (summaryLevelEl) {
     summaryLevelEl.textContent = runSummaryLevelText(level);
     summaryLevelEl.dataset.tone = state.mode === "paused" ? "paused" : "level";
@@ -556,7 +564,7 @@ function goToStartScreen() {
   levelRuntime = hydrateLevelRuntime(LEVELS[0]);
   resetPlayerPosition();
   renderLives();
-  statusEl.textContent = "Press Enter, Space, W, ↑, or tap ▲ to start Dachshund Dash.";
+  statusEl.textContent = "Press Start.";
 }
 
 function openLevelSelect() {
@@ -1140,6 +1148,7 @@ function triggerSuperBark() {
 }
 
 function hydrateLevelRuntime(level) {
+  const enemyScale = level.giantEnemies ? 1.85 : 1;
   const boss = level.boss
     ? {
         ...level.boss,
@@ -1162,13 +1171,25 @@ function hydrateLevelRuntime(level) {
     bones: level.bones.map((b) => ({ ...b, taken: false })),
     hearts: (level.hearts || []).map((h) => ({ ...h, taken: false })),
     capes: (level.capes || []).map((c) => ({ ...c, taken: false })),
-    enemies: level.enemies.map((e) => ({ ...e, dying: false, dead: false, vx: 0, vy: 0 })),
+    enemies: level.enemies.map((e) => ({
+      ...e,
+      w: e.w * enemyScale,
+      h: e.h * enemyScale,
+      y: e.y - (e.h * enemyScale - e.h),
+      speed: e.speed * (level.giantEnemies ? 0.82 : 1),
+      giant: Boolean(level.giantEnemies),
+      dying: false,
+      dead: false,
+      vx: 0,
+      vy: 0,
+    })),
     spikes: level.spikes.map((s) => ({ ...s })),
     platforms: level.platforms.map((p) => ({ ...p })),
     finishFlag: { ...level.finishFlag },
     boss,
     sirens: (level.sirens || []).map((s) => ({ ...s })),
     toys: (level.toys || []).map((t) => ({ ...t })),
+    lightSwitches: (level.lightSwitches || []).map((s) => ({ ...s, on: false })),
   };
 }
 
@@ -1432,11 +1453,11 @@ function loadLevel(index, options = {}) {
   renderLives();
 
   resetPlayerPosition();
-  const bossHint = levelRuntime.boss ? ` Defeat ${levelRuntime.boss.name} before exiting.` : "";
+  const bossHint = levelRuntime.boss ? " Boss first." : "";
   const musicSrc = levelRuntime.boss ? BOSS_MUSIC : MAIN_MUSIC;
   setBgTrack(musicSrc);
 
-  statusEl.textContent = `${levelRuntime.name}: Collect ${state.totalBones} bones and reach the flag!${bossHint}`;
+  statusEl.textContent = `${levelRuntime.name}: ${state.totalBones} bones.${bossHint}`;
 }
 
 function startGame() {
@@ -1634,6 +1655,17 @@ function updateToyProjectile(level) {
   }
 }
 
+function updateLightSwitches(level) {
+  if (!level.dark || !level.lightSwitches?.length) return;
+  for (const light of level.lightSwitches) {
+    if (light.on) continue;
+    if (intersects(state.dog, light)) {
+      light.on = true;
+      statusEl.textContent = `${level.name}: Lights on!`;
+    }
+  }
+}
+
 function update() {
   const jumpPressedNow = state.jumpPressedThisFrame;
   state.jumpPressedThisFrame = false;
@@ -1690,16 +1722,30 @@ function update() {
 
   updateSirens(level);
   updateToyProjectile(level);
+  updateLightSwitches(level);
 
   if (Date.now() >= state.hitControlLockUntil) {
-    dog.vx = 0;
-    if (state.keys.left) {
-      dog.vx = -MOVE_SPEED;
-      dog.facing = -1;
-    }
-    if (state.keys.right) {
-      dog.vx = MOVE_SPEED;
-      dog.facing = 1;
+    if (level.water) {
+      dog.vx *= WATER_DRAG;
+      if (Math.abs(dog.vx) < 0.08) dog.vx = 0;
+      if (state.keys.left) {
+        dog.vx = Math.max(-WATER_MAX_VX, dog.vx - WATER_THRUST);
+        dog.facing = -1;
+      }
+      if (state.keys.right) {
+        dog.vx = Math.min(WATER_MAX_VX, dog.vx + WATER_THRUST);
+        dog.facing = 1;
+      }
+    } else {
+      dog.vx = 0;
+      if (state.keys.left) {
+        dog.vx = -MOVE_SPEED;
+        dog.facing = -1;
+      }
+      if (state.keys.right) {
+        dog.vx = MOVE_SPEED;
+        dog.facing = 1;
+      }
     }
 
     if (Date.now() < state.sirenSlowUntil) {
@@ -1745,6 +1791,8 @@ function update() {
   }
 
   const capeActive = Date.now() < state.capeUntil;
+  const waterMode = Boolean(level.water && !capeActive);
+  const moonGravity = level.moon ? 0.42 : 1;
   if (!capeActive && capeAmbientAudio) {
     stopCapeAmbient();
     startBgMusic();
@@ -1752,8 +1800,8 @@ function update() {
 
   const hasBufferedJump = now <= state.jumpBufferedUntil;
   const canUseGroundJump = dog.onGround || (now - state.lastGroundedAt) <= COYOTE_TIME_MS;
-  if (!capeActive && hasBufferedJump && canUseGroundJump && now >= state.hitControlLockUntil) {
-    dog.vy = JUMP_VELOCITY;
+  if (!waterMode && !capeActive && hasBufferedJump && canUseGroundJump && now >= state.hitControlLockUntil) {
+    dog.vy = JUMP_VELOCITY * (level.moon ? 0.96 : 1);
     dog.onGround = false;
     state.superJumpUsed = false;
     state.airJumpsUsed = 0;
@@ -1769,13 +1817,8 @@ function update() {
   // Mid-air double jump: one extra jump while airborne if you tap jump again.
   const newJumpTap = state.lastJumpTapAt > state.lastAirJumpConsumedAt;
   const nearApex = dog.vy > -2; // wait until upward velocity has nearly ended (close to peak)
-  if (
-    !dog.onGround &&
-    newJumpTap &&
-    state.airJumpsUsed < 1 &&
-    nearApex
-  ) {
-    dog.vy = JUMP_VELOCITY;
+  if (!waterMode && !dog.onGround && newJumpTap && state.airJumpsUsed < 1 && nearApex) {
+    dog.vy = JUMP_VELOCITY * (level.moon ? 0.96 : 1);
     state.airJumpsUsed += 1;
     state.lastAirJumpConsumedAt = state.lastJumpTapAt;
     state.superJumpUsed = true; // prevent super-jump float chaining
@@ -1785,7 +1828,7 @@ function update() {
   }
 
   // Super jump: keep holding jump to trigger a second, stronger lift while rising.
-  if (!capeActive && state.keys.jump && state.jumpHeld && !dog.onGround && !state.superJumpUsed) {
+  if (!waterMode && !capeActive && state.keys.jump && state.jumpHeld && !dog.onGround && !state.superJumpUsed) {
     const heldLongEnough = state.jumpHoldStartedAt && (Date.now() - state.jumpHoldStartedAt) >= SUPER_JUMP_MIN_ASCENT_MS;
     if (heldLongEnough && dog.vy < 0) {
       dog.vy += SUPER_JUMP_BOOST;
@@ -1800,8 +1843,15 @@ function update() {
     if (state.keys.down) dog.vy += CAPE_DESCEND;
     dog.vy += GRAVITY * 0.35;
     dog.vy = Math.max(CAPE_MAX_RISE, Math.min(7, dog.vy));
+  } else if (waterMode) {
+    if (state.keys.jump) dog.vy -= WATER_THRUST;
+    if (state.keys.down) dog.vy += WATER_THRUST * 0.72;
+    dog.vy += WATER_GRAVITY;
+    dog.vy *= 0.98;
+    dog.vy = Math.max(-WATER_MAX_VY, Math.min(WATER_MAX_VY, dog.vy));
   } else {
-    const grav = Date.now() < state.superJumpFloatUntil ? GRAVITY * SUPER_JUMP_FLOAT_GRAVITY_FACTOR : GRAVITY;
+    const baseGravity = GRAVITY * moonGravity;
+    const grav = Date.now() < state.superJumpFloatUntil ? baseGravity * SUPER_JUMP_FLOAT_GRAVITY_FACTOR : baseGravity;
     dog.vy += grav;
   }
 
@@ -1965,25 +2015,144 @@ function update() {
 
 function drawParallax() {
   const cam = state.cameraX;
+  const level = levelRuntime;
 
-  const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  g.addColorStop(0, "#7fd0ff");
-  g.addColorStop(1, "#d4f2ff");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (level.water) {
+    const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    g.addColorStop(0, "#08365f");
+    g.addColorStop(0.55, "#0b5f8a");
+    g.addColorStop(1, "#0d7f96");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  ctx.fillStyle = "rgba(255,255,255,0.7)";
-  for (let i = 0; i < 8; i++) {
-    const cx = ((i * 260 - cam * 0.2) % (canvas.width + 320)) - 120;
-    const cy = 60 + (i % 3) * 50;
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, 56, 24, 0, 0, Math.PI * 2);
-    ctx.ellipse(cx + 42, cy - 8, 40, 20, 0, 0, Math.PI * 2);
-    ctx.ellipse(cx - 40, cy - 5, 34, 18, 0, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.07)";
+    for (let i = 0; i < 6; i++) {
+      const x = ((i * 180 - cam * 0.12) % (canvas.width + 260)) - 80;
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x + 90, canvas.height);
+      ctx.lineTo(x + 180, canvas.height);
+      ctx.lineTo(x + 50, 0);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    ctx.fillStyle = "rgba(190, 238, 255, 0.45)";
+    for (let i = 0; i < 22; i++) {
+      const x = ((i * 120 - cam * 0.45 + Date.now() * 0.02) % (canvas.width + 120)) - 40;
+      const y = (i * 33 + Date.now() * 0.03) % canvas.height;
+      ctx.beginPath();
+      ctx.arc(x, canvas.height - y, 5 + (i % 3), 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.fillStyle = "rgba(9, 74, 70, 0.72)";
+    for (let i = 0; i < 16; i++) {
+      const x = i * 150 - cam * 0.5;
+      ctx.fillRect(x + 30, 430, 8, 110);
+      ctx.beginPath();
+      ctx.ellipse(x + 34, 430, 24, 80, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    return;
   }
 
-  ctx.fillStyle = "#9dd59f";
+  if (level.moon) {
+    const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    g.addColorStop(0, "#060814");
+    g.addColorStop(0.65, "#15193d");
+    g.addColorStop(1, "#2a2753");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    for (let i = 0; i < 44; i++) {
+      const x = (i * 97 - cam * 0.08) % (canvas.width + 60);
+      const y = 30 + (i * 37) % 230;
+      ctx.fillRect(x, y, i % 3 === 0 ? 3 : 2, i % 3 === 0 ? 3 : 2);
+    }
+
+    ctx.fillStyle = "rgba(216, 226, 255, 0.95)";
+    ctx.beginPath();
+    ctx.arc(canvas.width - 170, 92, 54, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(120, 130, 170, 0.26)";
+    ctx.beginPath();
+    ctx.arc(canvas.width - 190, 74, 16, 0, Math.PI * 2);
+    ctx.arc(canvas.width - 146, 112, 12, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#6f748c";
+    for (let i = 0; i < 11; i++) {
+      const x = i * 260 - cam * 0.3;
+      ctx.beginPath();
+      ctx.arc(x + 120, 500, 180, Math.PI, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.fillStyle = "#8c90a8";
+    for (let i = 0; i < 14; i++) {
+      const x = i * 190 - cam * 0.45;
+      ctx.beginPath();
+      ctx.arc(x + 70, 520, 95, Math.PI, Math.PI * 2);
+      ctx.fill();
+    }
+    return;
+  }
+
+  if (level.dark) {
+    const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    g.addColorStop(0, "#02030a");
+    g.addColorStop(0.7, "#081222");
+    g.addColorStop(1, "#101d32");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = "rgba(255, 240, 164, 0.08)";
+    for (let i = 0; i < 9; i++) {
+      const x = i * 260 - cam * 0.2;
+      ctx.beginPath();
+      ctx.arc(x + 120, 120 + (i % 2) * 36, 24, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.fillStyle = "#0c1627";
+    for (let i = 0; i < 12; i++) {
+      const x = i * 240 - cam * 0.4;
+      ctx.beginPath();
+      ctx.arc(x + 90, 500, 155, Math.PI, Math.PI * 2);
+      ctx.fill();
+    }
+    return;
+  }
+
+  if (level.giantEnemies) {
+    const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    g.addColorStop(0, "#ffcb86");
+    g.addColorStop(0.52, "#ff965b");
+    g.addColorStop(1, "#5c2d47");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  } else {
+    const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    g.addColorStop(0, "#7fd0ff");
+    g.addColorStop(1, "#d4f2ff");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = "rgba(255,255,255,0.7)";
+    for (let i = 0; i < 8; i++) {
+      const cx = ((i * 260 - cam * 0.2) % (canvas.width + 320)) - 120;
+      const cy = 60 + (i % 3) * 50;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, 56, 24, 0, 0, Math.PI * 2);
+      ctx.ellipse(cx + 42, cy - 8, 40, 20, 0, 0, Math.PI * 2);
+      ctx.ellipse(cx - 40, cy - 5, 34, 18, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  ctx.fillStyle = level.giantEnemies ? "#b47065" : "#9dd59f";
   for (let i = 0; i < 12; i++) {
     const x = i * 320 - cam * 0.35;
     ctx.beginPath();
@@ -1991,7 +2160,7 @@ function drawParallax() {
     ctx.fill();
   }
 
-  ctx.fillStyle = "#6db77d";
+  ctx.fillStyle = level.giantEnemies ? "#7f4d52" : "#6db77d";
   for (let i = 0; i < 12; i++) {
     const x = i * 300 - cam * 0.55;
     ctx.beginPath();
@@ -2017,13 +2186,32 @@ function roundedRect(x, y, w, h, r) {
 
 function drawPlatform(p) {
   const radius = Math.min(12, Math.min(p.w, p.h) / 2);
-  ctx.fillStyle = "#7f5640";
+  const level = levelRuntime;
+  let top = "#7f5640";
+  let bottom = "#4e3529";
+  let highlight = "rgba(255,255,255,0.12)";
+
+  if (level.water) {
+    top = "#466a74";
+    bottom = "#24424a";
+    highlight = "rgba(180,240,255,0.16)";
+  } else if (level.moon) {
+    top = "#8b90aa";
+    bottom = "#5a617d";
+    highlight = "rgba(255,255,255,0.18)";
+  } else if (level.dark) {
+    top = "#36404f";
+    bottom = "#202632";
+    highlight = "rgba(255,230,150,0.08)";
+  }
+
+  ctx.fillStyle = top;
   roundedRect(p.x, p.y, p.w, p.h, radius);
   ctx.fill();
-  ctx.fillStyle = "#4e3529";
+  ctx.fillStyle = bottom;
   roundedRect(p.x, p.y + p.h - 10, p.w, 12, Math.max(4, radius * 0.6));
   ctx.fill();
-  ctx.fillStyle = "rgba(255,255,255,0.12)";
+  ctx.fillStyle = highlight;
   roundedRect(p.x + 6, p.y + 4, Math.max(0, p.w - 12), Math.max(6, p.h * 0.32), Math.max(3, radius * 0.4));
   ctx.fill();
 }
@@ -2102,6 +2290,61 @@ function drawToyProjectile(p) {
   ctx.fillRect(p.x + 3, p.y + 2, p.w - 6, p.h - 4);
 }
 
+function drawLightSwitch(light) {
+  const glow = light.on ? 0.55 + Math.sin(Date.now() * 0.01) * 0.1 : 0;
+  if (light.on) {
+    ctx.fillStyle = `rgba(255, 235, 150, ${glow})`;
+    ctx.beginPath();
+    ctx.arc(light.x + light.w / 2, light.y + light.h / 2, 44, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.fillStyle = "#2e3642";
+  roundedRect(light.x, light.y, light.w, light.h, 8);
+  ctx.fill();
+  ctx.fillStyle = light.on ? "#ffe792" : "#7f8ca5";
+  roundedRect(light.x + 6, light.y + 8, light.w - 12, light.h - 16, 6);
+  ctx.fill();
+}
+
+function drawDarknessOverlay(level) {
+  if (!level.dark) return;
+  const lights = level.lightSwitches || [];
+  const onCount = lights.filter((light) => light.on).length;
+  if (lights.length && onCount === lights.length) return;
+
+  ctx.save();
+  ctx.fillStyle = `rgba(2, 4, 10, ${0.8 - onCount * 0.16})`;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.globalCompositeOperation = "destination-out";
+
+  const dogX = state.dog.x + state.dog.w / 2 - state.cameraX;
+  const dogY = state.dog.y + state.dog.h / 2;
+  const dogRadius = 100 + onCount * 34;
+  const dogGlow = ctx.createRadialGradient(dogX, dogY, 24, dogX, dogY, dogRadius);
+  dogGlow.addColorStop(0, "rgba(255,255,255,1)");
+  dogGlow.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = dogGlow;
+  ctx.beginPath();
+  ctx.arc(dogX, dogY, dogRadius, 0, Math.PI * 2);
+  ctx.fill();
+
+  for (const light of lights) {
+    if (!light.on) continue;
+    const x = light.x + light.w / 2 - state.cameraX;
+    const y = light.y + light.h / 2;
+    const glow = ctx.createRadialGradient(x, y, 12, x, y, 120);
+    glow.addColorStop(0, "rgba(255,255,255,0.95)");
+    glow.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(x, y, 120, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
 function drawSiren(s) {
   ctx.fillStyle = s.disabled ? "#777" : "#6c7ba0";
   ctx.fillRect(s.x, s.y, s.w, s.h);
@@ -2144,13 +2387,13 @@ function drawSirenWave(s) {
 
 function drawEnemy(e) {
   const isDying = e.dying;
-  ctx.fillStyle = isDying ? "#4c2525" : "#6f2f2f";
+  ctx.fillStyle = isDying ? "#4c2525" : e.giant ? "#824141" : "#6f2f2f";
   ctx.fillRect(e.x, e.y, e.w, e.h);
-  ctx.fillStyle = "#d6a574";
-  ctx.fillRect(e.x + 8, e.y + 8, e.w - 16, 10);
+  ctx.fillStyle = e.giant ? "#efc496" : "#d6a574";
+  ctx.fillRect(e.x + e.w * 0.16, e.y + e.h * 0.2, e.w - e.w * 0.32, Math.max(10, e.h * 0.24));
   if (!isDying) {
     ctx.fillStyle = "#fff";
-    ctx.fillRect(e.x + (e.dir > 0 ? 24 : 8), e.y + 8, 5, 5);
+    ctx.fillRect(e.x + (e.dir > 0 ? e.w * 0.56 : e.w * 0.18), e.y + e.h * 0.2, Math.max(5, e.w * 0.12), Math.max(5, e.h * 0.12));
   }
 }
 
@@ -2909,74 +3152,50 @@ function drawOverlay() {
     grad.addColorStop(1, "#0f1c35");
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    drawLogo(canvas.width / 2, canvas.height / 2 - 30, 0.35);
+    drawLogo(canvas.width / 2, canvas.height / 2 - 22, 0.35);
     ctx.fillStyle = "#ffffff";
     ctx.font = "bold 48px 'Flubby', 'Roboto', system-ui";
     ctx.textAlign = "center";
-    ctx.fillText("Dachshund Dash", canvas.width / 2, canvas.height / 2 + 60);
-    ctx.font = "20px 'Roboto', 'Roboto', system-ui";
-    ctx.fillText("Guide the long-haired dachshund to the flag.", canvas.width / 2, canvas.height / 2 + 92);
-    drawCenteredChipRow(canvas.height / 2 + 126, ["20 levels", "2 corgi bosses", "Super Bark + cape flight"], {
-      font: "15px 'Roboto', system-ui",
-      paddingX: 12,
+    ctx.fillText("Dachshund Dash", canvas.width / 2, canvas.height / 2 + 68);
+    drawCenteredChipRow(canvas.height / 2 + 112, ["Swim", "Moon", "Dark", "Big Corgis"], {
+      font: "bold 15px 'Roboto', system-ui",
+      paddingX: 14,
       height: 30,
       gap: 10,
-      bg: "rgba(33, 20, 53, 0.84)",
-      border: "rgba(206, 173, 255, 0.42)",
-      color: "#f7efff",
+      bg: "rgba(19, 33, 64, 0.84)",
+      border: "rgba(159, 229, 255, 0.34)",
+      color: "#effaff",
     });
-    drawCenteredChipRow(canvas.height / 2 + 160, ["Collect every bone", "Avoid spikes + corgis", "Then touch the flag"], {
-      font: "15px 'Roboto', system-ui",
-      paddingX: 12,
-      height: 30,
-      gap: 10,
-      bg: "rgba(14, 46, 34, 0.84)",
-      border: "rgba(76, 255, 136, 0.42)",
-      color: "#ecfff0",
-    });
-    drawStartPromptCard(canvas.height / 2 + 188, "▶ Press Enter, Space, W, ↑, or tap ▲ to start");
-    drawCenteredChipRow(canvas.height / 2 + 244, ["Pause anytime: P / Esc or the button below", "Secret: type HENRY"], {
-      font: "bold 14px 'Roboto', system-ui",
-      paddingX: 12,
-      height: 28,
-      gap: 10,
-      bg: "rgba(26, 18, 48, 0.84)",
-      border: "rgba(255, 184, 233, 0.36)",
-      color: "#ffe9f7",
-    });
+    drawStartPromptCard(canvas.height / 2 + 166, "▶ Press Start");
     ctx.textAlign = "start";
     return;
   }
 
   if (state.mode === "title") {
-    ctx.fillStyle = "rgba(0, 0, 0, 0.38)";
+    ctx.fillStyle = "rgba(0, 0, 0, 0.28)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = "#fff";
     ctx.font = "bold 52px 'Flubby', 'Roboto', system-ui";
     ctx.textAlign = "center";
-    ctx.fillText(levelRuntime.name, canvas.width / 2, canvas.height / 2 - 8);
-    ctx.font = "22px 'Roboto', 'Roboto', system-ui";
-    const subtitle = levelRuntime.boss ? `Boss encounter: ${levelRuntime.boss.name}` : "Get ready...";
-    ctx.fillText(subtitle, canvas.width / 2, canvas.height / 2 + 28);
-
-    const badges = levelObjectiveBadges(levelRuntime);
-    if (badges.length) {
-      const chipGap = 10;
-      ctx.font = "16px 'Roboto', system-ui";
-      const chipWidths = badges.map((badge) => ctx.measureText(badge).width + 24);
-      const totalWidth = chipWidths.reduce((sum, width) => sum + width, 0) + chipGap * Math.max(0, badges.length - 1);
-      let chipX = canvas.width / 2 - totalWidth / 2;
-      const chipY = canvas.height / 2 + 52;
-      badges.forEach((badge, index) => {
-        const isBossBadge = levelRuntime.boss && badge.startsWith("boss:");
-        const bg = isBossBadge ? "rgba(78, 27, 17, 0.88)" : "rgba(9, 22, 44, 0.82)";
-        const border = isBossBadge ? "rgba(255, 189, 122, 0.58)" : "rgba(159, 229, 255, 0.45)";
-        chipX += drawInfoChip(chipX, chipY, badge, { bg, border });
-        chipX += chipGap;
+    ctx.fillText(levelRuntime.name, canvas.width / 2, canvas.height / 2);
+    const tags = [];
+    if (levelRuntime.water) tags.push("Swim");
+    if (levelRuntime.moon) tags.push("Moon");
+    if (levelRuntime.giantEnemies) tags.push("Big Corgis");
+    if (levelRuntime.dark) tags.push("Lights");
+    if (levelRuntime.boss) tags.push("Boss");
+    if (tags.length) {
+      drawCenteredChipRow(canvas.height / 2 + 46, tags, {
+        font: "bold 15px 'Roboto', system-ui",
+        paddingX: 14,
+        height: 30,
+        gap: 10,
+        bg: "rgba(9, 22, 44, 0.82)",
+        border: "rgba(159, 229, 255, 0.34)",
+        color: "#f4fbff",
       });
     }
-
-    drawLevelPreviewCard(canvas.width / 2 - 270, canvas.height / 2 + 94, levelRuntime);
+    drawStartPromptCard(canvas.height / 2 + 102, "▶ Press Start");
     ctx.textAlign = "start";
     return;
   }
@@ -2987,9 +3206,7 @@ function drawOverlay() {
     ctx.fillStyle = "#d9fbff";
     ctx.font = "bold 42px 'Flubby', 'Roboto', system-ui";
     ctx.textAlign = "center";
-    ctx.fillText(`${levelRuntime.name} COMPLETE!`, canvas.width / 2, 88);
-    ctx.font = "20px 'Roboto', 'Roboto', system-ui";
-    ctx.fillText("Super Bark Celebration!", canvas.width / 2, 118);
+    ctx.fillText(`${levelRuntime.name} CLEAR!`, canvas.width / 2, 96);
     ctx.textAlign = "start";
     return;
   }
@@ -3123,6 +3340,7 @@ function render() {
   for (const h of level.hearts || []) drawHeartPickup(h);
   for (const c of level.capes || []) drawCapePickup(c);
   for (const t of level.toys || []) drawToy(t);
+  for (const light of level.lightSwitches || []) drawLightSwitch(light);
   for (const s of level.sirens || []) drawSiren(s);
   for (const e of level.enemies) if (!e.dead) drawEnemy(e);
   drawBoss(level.boss);
@@ -3133,6 +3351,8 @@ function render() {
   drawDachshund(state.dog);
 
   ctx.restore();
+
+  drawDarknessOverlay(level);
 
   if (state.sirenOverlayUntil > Date.now()) {
     ctx.save();
@@ -3172,10 +3392,8 @@ function render() {
 
   drawBarkIcon(18, 22, cooldownLeft <= 0, cooldownLeft);
   drawCapeIcon(70, 22, capeLeft > 0, Math.max(0, Math.ceil(capeLeft / 1000)));
-  drawAbilityStatusHUD(cooldownLeft, capeLeft);
   drawBonesHUD(state.totalBones, state.bonesCollected);
   drawLevelProgressHUD(level);
-  drawObjectiveGuideHUD(level);
 
   if (state.mode === "playing") {
     ctx.save();
