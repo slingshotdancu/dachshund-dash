@@ -1,5 +1,20 @@
 # Dachshund Dash Changelog
 
+## 2026-06-10
+### Daily improvement: desktop game-over restart button now truly restarts
+- Fixed a real UX mismatch in the desktop **Quick actions** card: when the game-over state surfaced a **Restart run** button, clicking it used to send players back to the title flow instead of actually restarting the run.
+- The button now correctly restarts from **Level 1** with full hearts and refreshed continues, matching its visible label and the surrounding restart guidance.
+- Kept the change narrowly scoped to the existing desktop game-over action, making it a safe behavior-alignment fix without altering combat, level rules, or touch controls.
+
+![Quick actions panel showing the desktop Restart run button in the game-over state](changelog/2026-06-10-desktop-restart-run-button.png)
+
+### Daily improvement: fullscreen exit helper copy
+- Updated the desktop **Fullscreen** quick-action helper text to explicitly teach **`Esc`** as the way back out after expanding the playfield.
+- This closes a small but real usability gap: fullscreen mode hid the surrounding shell, so first-time players had no visible reminder for how to exit once they went in.
+- Kept the change local to the existing quick-action copy plus matching button accessibility text, making it a safe discoverability polish pass without changing gameplay.
+
+![Quick actions panel showing the Fullscreen helper text updated to mention Esc for exiting fullscreen](changelog/2026-06-10-fullscreen-exit-helper.png)
+
 ## 2026-06-09
 ### Daily improvement: Enter start shortcut discoverability
 - Surfaced **`Enter`** everywhere players look before a run starts: the desktop **Start** shortcut chip, the run-summary start prompt, the title-screen status text, and the level-intro start banner now all explicitly mention it.

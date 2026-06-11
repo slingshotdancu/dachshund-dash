@@ -3609,7 +3609,7 @@ if (startDesktopBtn) {
     } else if (state.mode === "dead") {
       continueRun();
     } else if (state.mode === "gameover") {
-      quitToStart();
+      resetGame();
     }
   });
 }
@@ -3662,6 +3662,13 @@ if (fullscreenBtn) {
   const updateLabel = () => {
     const active = document.fullscreenElement === targetEl;
     fullscreenBtn.textContent = active ? "⛶ Exit Fullscreen" : "⛶ Fullscreen";
+    fullscreenBtn.setAttribute("aria-label", active ? "Exit fullscreen" : "Enter fullscreen");
+    const hintEl = fullscreenBtn.parentElement?.querySelector(".utility-btn-hint");
+    if (hintEl) {
+      hintEl.innerHTML = active
+        ? "Fullscreen active — press <kbd>Esc</kbd> or click to exit."
+        : "Stretch the playfield for distraction-free play, then press <kbd>Esc</kbd> to exit.";
+    }
     document.body.classList.toggle("fullscreen-mode", active);
   };
   updateLabel();
