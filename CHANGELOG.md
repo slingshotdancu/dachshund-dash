@@ -1,6 +1,20 @@
 # Dachshund Dash Changelog
 
 ## 2026-06-11
+### Progression pass: first two levels stay normal and a volcano stage now joins the run
+- Moved the special-theme rollout later so **Levels 1 and 2 stay normal**, giving players time to learn the controls before the gimmick stages begin.
+- Shifted the themed progression so the run now introduces **Swim** on Level 3, **Moon** on Level 4, **Volcano** on Level 5, **Big Corgis** on Level 6, and **Lights** on Level 7.
+- Added a new **volcano** stage with a fiery backdrop and visible **lava pools** filling the fall gaps, so that level reads like a distinct hazard zone instead of a standard stage reskin.
+
+![Volcano level showing lava-filled gaps and the new Stage Volcano presentation](changelog/2026-06-11-volcano-level.png)
+
+### Tuning pass: moon jumps got floatier and dark-stage lights now fully cycle
+- Tuned the **moon** stage so Henry’s vertical movement is slower in both directions: jumps rise more gently, falls cap out sooner, and his **horizontal run speed stays unchanged**.
+- Fixed the **lights** stage so Henry remains clearly visible inside the spotlight instead of disappearing into the darkness.
+- Light switches now turn the whole stage visible like a normal run for **5 seconds**, then switch back off automatically.
+
+![Dark spotlight level showing Henry clearly visible in the spotlight after the moon and lights tuning pass](changelog/2026-06-11-moon-and-lights-tuning.png)
+
 ### Daily improvement: HENRY level select now previews themed stages too
 - Expanded the hidden **HENRY** level-select badges so special stage variants are discoverable before players jump in.
 - Water, moon, giant-corgi, and lights-out levels now show **Swim**, **Moon**, **Big Corgis**, and **Lights** tags right in the level grid, alongside the existing **Cape**, **Toy**, and **Boss** badges.

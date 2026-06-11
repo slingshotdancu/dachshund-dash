@@ -46,6 +46,12 @@ const WATER_THRUST = 0.55;
 const WATER_DRAG = 0.9;
 const WATER_MAX_VY = 3.2;
 const WATER_MAX_VX = 2.4;
+const MOON_GRAVITY_FACTOR = 0.3;
+const MOON_JUMP_VELOCITY_FACTOR = 0.88;
+const MOON_MAX_FALL_SPEED = 6;
+const DARK_SWITCH_REVEAL_MS = 5000;
+const LAVA_TOP_Y = 510;
+const LAVA_HEIGHT = 30;
 
 const AUDIO = {
   musicVol: 60, // 0-100
@@ -117,6 +123,21 @@ function intersects(a, b) {
 
 function isEnemyAlive(enemy) {
   return !enemy.dead && !enemy.dying;
+}
+
+function buildLavaPools(platforms, worldWidth) {
+  const sorted = [...platforms].sort((a, b) => a.x - b.x);
+  const pools = [];
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const current = sorted[i];
+    const next = sorted[i + 1];
+    const gapStart = current.x + current.w;
+    const gapWidth = next.x - gapStart;
+    if (gapWidth >= 70) {
+      pools.push({ x: gapStart, y: LAVA_TOP_Y, w: gapWidth, h: LAVA_HEIGHT });
+    }
+  }
+  return pools.filter((pool) => pool.x < worldWidth - 10);
 }
 
 function makeLevelTemplate(levelNum) {
@@ -222,6 +243,7 @@ function makeLevelTemplate(levelNum) {
     capes,
     sirens,
     toys,
+    lavaPools: [],
     finishFlag: { x: worldWidth - 60, y: 360, w: 16, h: 140 },
     boss: bossLevel
       ? {
@@ -277,7 +299,6 @@ const LEVELS = [
     toys: [],
     finishFlag: { x: 2340, y: 420, w: 16, h: 80 },
     boss: null,
-    water: true,
   },
   {
     id: 2,
@@ -336,11 +357,16 @@ if (LEVELS[5] && LEVELS[5].platforms && LEVELS[5].platforms[1]) {
 }
 
 // Practice pass: add more visual/gameplay variety with less on-screen reading.
-if (LEVELS[1]) LEVELS[1].moon = true;
-if (LEVELS[2]) LEVELS[2].giantEnemies = true;
-if (LEVELS[3]) {
-  LEVELS[3].dark = true;
-  LEVELS[3].lightSwitches = [
+if (LEVELS[2]) LEVELS[2].water = true;
+if (LEVELS[3]) LEVELS[3].moon = true;
+if (LEVELS[4]) {
+  LEVELS[4].volcano = true;
+  LEVELS[4].lavaPools = buildLavaPools(LEVELS[4].platforms, LEVELS[4].worldWidth);
+}
+if (LEVELS[5]) LEVELS[5].giantEnemies = true;
+if (LEVELS[6]) {
+  LEVELS[6].dark = true;
+  LEVELS[6].lightSwitches = [
     { x: 760, y: 398, w: 26, h: 42, on: false },
     { x: 1640, y: 340, w: 26, h: 42, on: false },
     { x: 2480, y: 282, w: 26, h: 42, on: false },
@@ -492,6 +518,7 @@ function runSummaryTheme(level = levelRuntime) {
   const labels = [];
   if (level?.water) labels.push("Swim");
   if (level?.moon) labels.push("Moon");
+  if (level?.volcano) labels.push("Volcano");
   if (level?.giantEnemies) labels.push("Big Corgis");
   if (level?.dark) labels.push("Lights");
 
@@ -501,7 +528,7 @@ function runSummaryTheme(level = levelRuntime) {
 
   let tone = "theme";
   if (level?.dark) tone = "warning";
-  else if (level?.giantEnemies) tone = "boss";
+  else if (level?.volcano || level?.giantEnemies) tone = "boss";
   else if (level?.water || level?.moon) tone = "boost";
 
   return { text: `Stage ${labels.join(" · ")}`, tone };
@@ -617,6 +644,7 @@ function openLevelSelect() {
     const badges = [];
     if (lvl.water) badges.push("Swim");
     if (lvl.moon) badges.push("Moon");
+    if (lvl.volcano) badges.push("Volcano");
     if (lvl.giantEnemies) badges.push("Big Corgis");
     if (lvl.dark) badges.push("Lights");
     if (lvl.capes?.length) badges.push("Cape");
@@ -1214,12 +1242,14 @@ function hydrateLevelRuntime(level) {
       vy: 0,
     })),
     spikes: level.spikes.map((s) => ({ ...s })),
+    lavaPools: (level.lavaPools || []).map((pool) => ({ ...pool })),
     platforms: level.platforms.map((p) => ({ ...p })),
     finishFlag: { ...level.finishFlag },
     boss,
     sirens: (level.sirens || []).map((s) => ({ ...s })),
     toys: (level.toys || []).map((t) => ({ ...t })),
-    lightSwitches: (level.lightSwitches || []).map((s) => ({ ...s, on: false })),
+    lightSwitches: (level.lightSwitches || []).map((s) => ({ ...s, on: false, wasTouching: false, litUntil: 0, rearmLocked: false })),
+    darkRevealUntil: 0,
   };
 }
 
@@ -1687,12 +1717,29 @@ function updateToyProjectile(level) {
 
 function updateLightSwitches(level) {
   if (!level.dark || !level.lightSwitches?.length) return;
-  for (const light of level.lightSwitches) {
-    if (light.on) continue;
-    if (intersects(state.dog, light)) {
-      light.on = true;
-      statusEl.textContent = `${level.name}: Lights on!`;
+
+  const now = Date.now();
+  if (level.darkRevealUntil && now >= level.darkRevealUntil) {
+    level.darkRevealUntil = 0;
+    for (const light of level.lightSwitches) {
+      light.on = false;
+      light.litUntil = 0;
     }
+  }
+
+  for (const light of level.lightSwitches) {
+    const touching = intersects(state.dog, light);
+    if (!touching && !light.on && level.darkRevealUntil <= now) {
+      light.rearmLocked = false;
+    }
+    if (touching && !light.rearmLocked) {
+      light.on = true;
+      light.litUntil = now + DARK_SWITCH_REVEAL_MS;
+      light.rearmLocked = true;
+      level.darkRevealUntil = now + DARK_SWITCH_REVEAL_MS;
+      statusEl.textContent = `${level.name}: Lights on for 5 seconds!`;
+    }
+    light.wasTouching = touching;
   }
 }
 
@@ -1822,7 +1869,7 @@ function update() {
 
   const capeActive = Date.now() < state.capeUntil;
   const waterMode = Boolean(level.water && !capeActive);
-  const moonGravity = level.moon ? 0.42 : 1;
+  const moonGravity = level.moon ? MOON_GRAVITY_FACTOR : 1;
   if (!capeActive && capeAmbientAudio) {
     stopCapeAmbient();
     startBgMusic();
@@ -1831,7 +1878,7 @@ function update() {
   const hasBufferedJump = now <= state.jumpBufferedUntil;
   const canUseGroundJump = dog.onGround || (now - state.lastGroundedAt) <= COYOTE_TIME_MS;
   if (!waterMode && !capeActive && hasBufferedJump && canUseGroundJump && now >= state.hitControlLockUntil) {
-    dog.vy = JUMP_VELOCITY * (level.moon ? 0.96 : 1);
+    dog.vy = JUMP_VELOCITY * (level.moon ? MOON_JUMP_VELOCITY_FACTOR : 1);
     dog.onGround = false;
     state.superJumpUsed = false;
     state.airJumpsUsed = 0;
@@ -1848,7 +1895,7 @@ function update() {
   const newJumpTap = state.lastJumpTapAt > state.lastAirJumpConsumedAt;
   const nearApex = dog.vy > -2; // wait until upward velocity has nearly ended (close to peak)
   if (!waterMode && !dog.onGround && newJumpTap && state.airJumpsUsed < 1 && nearApex) {
-    dog.vy = JUMP_VELOCITY * (level.moon ? 0.96 : 1);
+    dog.vy = JUMP_VELOCITY * (level.moon ? MOON_JUMP_VELOCITY_FACTOR : 1);
     state.airJumpsUsed += 1;
     state.lastAirJumpConsumedAt = state.lastJumpTapAt;
     state.superJumpUsed = true; // prevent super-jump float chaining
@@ -1883,6 +1930,7 @@ function update() {
     const baseGravity = GRAVITY * moonGravity;
     const grav = Date.now() < state.superJumpFloatUntil ? baseGravity * SUPER_JUMP_FLOAT_GRAVITY_FACTOR : baseGravity;
     dog.vy += grav;
+    if (level.moon) dog.vy = Math.min(dog.vy, MOON_MAX_FALL_SPEED);
   }
 
   dog.x += dog.vx;
@@ -2026,6 +2074,9 @@ function update() {
   for (const s of level.spikes) {
     if (intersects(dog, s)) takeHit("Ouch, spikes!");
   }
+  for (const pool of level.lavaPools || []) {
+    if (intersects(dog, pool)) takeHit("Too hot! Lava!");
+  }
 
   const flagTouch = intersects(dog, level.finishFlag);
   const bossDone = !level.boss || level.boss.dead;
@@ -2130,6 +2181,44 @@ function drawParallax() {
     return;
   }
 
+  if (level.volcano) {
+    const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    g.addColorStop(0, "#1f0603");
+    g.addColorStop(0.45, "#4a1209");
+    g.addColorStop(1, "#180909");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = "rgba(255, 160, 74, 0.18)";
+    for (let i = 0; i < 10; i++) {
+      const x = i * 210 - cam * 0.25;
+      ctx.beginPath();
+      ctx.arc(x + 100, 120 + (i % 2) * 36, 28, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.fillStyle = "#33120e";
+    for (let i = 0; i < 12; i++) {
+      const x = i * 220 - cam * 0.35;
+      ctx.beginPath();
+      ctx.moveTo(x, 540);
+      ctx.lineTo(x + 90, 320 + (i % 3) * 30);
+      ctx.lineTo(x + 180, 540);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    ctx.fillStyle = "rgba(255, 124, 44, 0.28)";
+    for (let i = 0; i < 18; i++) {
+      const x = ((i * 140 - cam * 0.5 + Date.now() * 0.03) % (canvas.width + 80)) - 20;
+      const y = 430 + (i % 4) * 24;
+      ctx.beginPath();
+      ctx.arc(x, y, 3 + (i % 3), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    return;
+  }
+
   if (level.dark) {
     const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
     g.addColorStop(0, "#02030a");
@@ -2229,6 +2318,10 @@ function drawPlatform(p) {
     top = "#8b90aa";
     bottom = "#5a617d";
     highlight = "rgba(255,255,255,0.18)";
+  } else if (level.volcano) {
+    top = "#6e3c2f";
+    bottom = "#3a1e18";
+    highlight = "rgba(255,182,120,0.14)";
   } else if (level.dark) {
     top = "#36404f";
     bottom = "#202632";
@@ -2259,6 +2352,28 @@ function drawSpike(s) {
     ctx.lineTo(x + 12, s.y + s.h - baseR);
     ctx.quadraticCurveTo(x + 12, s.y + s.h, x + 12 - baseR, s.y + s.h);
     ctx.closePath();
+    ctx.fill();
+  }
+}
+
+function drawLavaPool(pool) {
+  const flicker = Math.sin(Date.now() * 0.02 + pool.x * 0.01) * 0.08;
+  ctx.fillStyle = "#45110c";
+  roundedRect(pool.x, pool.y - 4, pool.w, pool.h + 6, 10);
+  ctx.fill();
+
+  const lavaGrad = ctx.createLinearGradient(pool.x, pool.y, pool.x, pool.y + pool.h);
+  lavaGrad.addColorStop(0, "rgba(255, 225, 120, 0.95)");
+  lavaGrad.addColorStop(0.45, `rgba(255, 126, 38, ${0.92 + flicker})`);
+  lavaGrad.addColorStop(1, "rgba(201, 40, 18, 0.95)");
+  ctx.fillStyle = lavaGrad;
+  roundedRect(pool.x, pool.y, pool.w, pool.h, 10);
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(255, 242, 186, 0.5)";
+  for (let x = pool.x + 10; x < pool.x + pool.w - 8; x += 24) {
+    ctx.beginPath();
+    ctx.arc(x, pool.y + 7 + Math.sin(Date.now() * 0.015 + x * 0.08) * 2, 4, 0, Math.PI * 2);
     ctx.fill();
   }
 }
@@ -2339,9 +2454,9 @@ function drawLightSwitch(light) {
 
 function drawDarknessOverlay(level) {
   if (!level.dark) return;
+  if (level.darkRevealUntil > Date.now()) return;
   const lights = level.lightSwitches || [];
   const onCount = lights.filter((light) => light.on).length;
-  if (lights.length && onCount === lights.length) return;
 
   ctx.save();
   ctx.fillStyle = `rgba(2, 4, 10, ${0.8 - onCount * 0.16})`;
@@ -2518,6 +2633,10 @@ function drawDachshund(dog) {
   let footY = dog.y + dog.h;
 
   ctx.save();
+  if (levelRuntime.dark && !(levelRuntime.darkRevealUntil > Date.now())) {
+    ctx.shadowColor = "rgba(255, 243, 189, 0.7)";
+    ctx.shadowBlur = 18;
+  }
   if (backflipping) {
     const duration = 900;
     const progress = 1 - Math.max(0, state.backflipUntil - now) / duration;
@@ -3187,7 +3306,7 @@ function drawOverlay() {
     ctx.font = "bold 48px 'Flubby', 'Roboto', system-ui";
     ctx.textAlign = "center";
     ctx.fillText("Dachshund Dash", canvas.width / 2, canvas.height / 2 + 68);
-    drawCenteredChipRow(canvas.height / 2 + 112, ["Swim", "Moon", "Dark", "Big Corgis"], {
+    drawCenteredChipRow(canvas.height / 2 + 112, ["Swim", "Moon", "Volcano", "Lights", "Big Corgis"], {
       font: "bold 15px 'Roboto', system-ui",
       paddingX: 14,
       height: 30,
@@ -3211,6 +3330,7 @@ function drawOverlay() {
     const tags = [];
     if (levelRuntime.water) tags.push("Swim");
     if (levelRuntime.moon) tags.push("Moon");
+    if (levelRuntime.volcano) tags.push("Volcano");
     if (levelRuntime.giantEnemies) tags.push("Big Corgis");
     if (levelRuntime.dark) tags.push("Lights");
     if (levelRuntime.boss) tags.push("Boss");
@@ -3364,6 +3484,7 @@ function render() {
   ctx.save();
   ctx.translate(-state.cameraX, 0);
 
+  for (const pool of level.lavaPools || []) drawLavaPool(pool);
   for (const p of level.platforms) drawPlatform(p);
   for (const s of level.spikes) drawSpike(s);
   for (const b of level.bones) drawBone(b);
@@ -3383,6 +3504,14 @@ function render() {
   ctx.restore();
 
   drawDarknessOverlay(level);
+  if (level.dark && !(level.darkRevealUntil > Date.now())) {
+    ctx.save();
+    ctx.translate(-state.cameraX, 0);
+    ctx.shadowColor = "rgba(255, 243, 189, 0.78)";
+    ctx.shadowBlur = 22;
+    drawDachshund(state.dog);
+    ctx.restore();
+  }
 
   if (state.sirenOverlayUntil > Date.now()) {
     ctx.save();
