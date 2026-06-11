@@ -1,6 +1,26 @@
 # Dachshund Dash Changelog
 
 ## 2026-06-11
+### Daily improvement: HENRY level select now previews themed stages too
+- Expanded the hidden **HENRY** level-select badges so special stage variants are discoverable before players jump in.
+- Water, moon, giant-corgi, and lights-out levels now show **Swim**, **Moon**, **Big Corgis**, and **Lights** tags right in the level grid, alongside the existing **Cape**, **Toy**, and **Boss** badges.
+- Kept the change local to the secret level-select UI, making it a safe discoverability polish pass without changing gameplay rules.
+
+![HENRY level select showing Swim, Moon, Big Corgis, and Lights theme tags on the early levels](changelog/2026-06-11-level-select-theme-tags.png)
+
+### Daily improvement: run summary now shows the current stage theme
+- Added a dedicated **Stage** pill to the run summary beneath the canvas so special level variants are visible outside the playfield HUD too.
+- Water, moon, giant-corgi, and lights-out levels now surface labels like **Stage Swim**, **Stage Moon**, **Stage Big Corgis**, and **Stage Lights**, while standard levels fall back to **Stage Classic**.
+- Kept the change local to the shell summary UI, making it a safe clarity upgrade that helps the new themed levels read at a glance.
+
+![Run summary showing the new Stage Swim theme pill beneath the canvas](changelog/2026-06-11-stage-theme-pill.png)
+
+### Follow-up polish: removed the Start/Flag progress map from gameplay
+- Removed the small **Start / Flag** progress bar from gameplay completely.
+- That strip was adding clutter without helping much, so the HUD now stays cleaner and more visual during play.
+
+![Gameplay HUD after removing the Start and Flag progress map](changelog/2026-06-11-no-start-flag-map.png)
+
 ### Practice update 1: start screen text cut way back
 - Trimmed the start/title presentation so it stays mostly visual instead of reading-heavy.
 - Removed the bulky helper copy around the shell, hid the status/run-summary text on the start screen, and shortened the in-canvas prompts to just a few words.

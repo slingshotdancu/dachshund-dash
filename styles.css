@@ -173,6 +173,12 @@ h1 {
   border-color: rgba(121, 225, 255, 0.28);
 }
 
+.summary-pill[data-tone="theme"] {
+  background: rgba(19, 40, 68, 0.88);
+  border-color: rgba(141, 212, 255, 0.34);
+  color: #f0fbff;
+}
+
 .summary-pill[data-tone="paused"] {
   background: rgba(43, 30, 72, 0.88);
   border-color: rgba(208, 176, 255, 0.34);

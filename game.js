@@ -12,6 +12,7 @@ const pauseDesktopBtn = document.getElementById("btn-pause-desktop");
 const fullscreenBtn = document.getElementById("btn-fullscreen");
 const audioBtn = document.getElementById("btn-audio");
 const summaryLevelEl = document.getElementById("summary-level");
+const summaryThemeEl = document.getElementById("summary-theme");
 const summaryBonesEl = document.getElementById("summary-bones");
 const summaryPowerEl = document.getElementById("summary-power");
 const summaryGoalEl = document.getElementById("summary-goal");
@@ -487,6 +488,25 @@ function levelProgressPercent() {
   return Math.max(0, Math.min(100, (current / LEVELS.length) * 100));
 }
 
+function runSummaryTheme(level = levelRuntime) {
+  const labels = [];
+  if (level?.water) labels.push("Swim");
+  if (level?.moon) labels.push("Moon");
+  if (level?.giantEnemies) labels.push("Big Corgis");
+  if (level?.dark) labels.push("Lights");
+
+  if (!labels.length) {
+    return { text: "Stage Classic", tone: "level" };
+  }
+
+  let tone = "theme";
+  if (level?.dark) tone = "warning";
+  else if (level?.giantEnemies) tone = "boss";
+  else if (level?.water || level?.moon) tone = "boost";
+
+  return { text: `Stage ${labels.join(" · ")}`, tone };
+}
+
 function runSummaryLevelText(level = levelRuntime) {
   const current = Math.min(LEVELS.length, Math.max(1, (state.currentLevelIndex || 0) + 1));
   const bossTag = level?.boss ? " · Boss" : "";
@@ -504,6 +524,12 @@ function renderRunSummary(level = levelRuntime) {
     summaryLevelEl.textContent = runSummaryLevelText(level);
     summaryLevelEl.dataset.tone = state.mode === "paused" ? "paused" : "level";
     summaryLevelEl.style.setProperty("--summary-progress", `${levelProgressPercent()}%`);
+  }
+
+  if (summaryThemeEl) {
+    const theme = runSummaryTheme(level);
+    summaryThemeEl.textContent = theme.text;
+    summaryThemeEl.dataset.tone = theme.tone;
   }
 
   if (summaryBonesEl) {
@@ -589,6 +615,10 @@ function openLevelSelect() {
     levelLabel.textContent = `Level ${idx + 1}`;
 
     const badges = [];
+    if (lvl.water) badges.push("Swim");
+    if (lvl.moon) badges.push("Moon");
+    if (lvl.giantEnemies) badges.push("Big Corgis");
+    if (lvl.dark) badges.push("Lights");
     if (lvl.capes?.length) badges.push("Cape");
     if (lvl.sirens?.length || lvl.toys?.length) badges.push("Toy");
     if (lvl.boss) badges.push("Boss");
@@ -3393,7 +3423,6 @@ function render() {
   drawBarkIcon(18, 22, cooldownLeft <= 0, cooldownLeft);
   drawCapeIcon(70, 22, capeLeft > 0, Math.max(0, Math.ceil(capeLeft / 1000)));
   drawBonesHUD(state.totalBones, state.bonesCollected);
-  drawLevelProgressHUD(level);
 
   if (state.mode === "playing") {
     ctx.save();
