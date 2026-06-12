@@ -26,6 +26,7 @@ let dieAudio = null;
 let capeAmbientAudio = null;
 
 const MAIN_MUSIC = "assets/Henry.wav";
+const LEVEL_ONE_MUSIC = "assets/levelone.wav";
 const BOSS_MUSIC = "assets/BossLevels.wav";
 const LOGO_IMG = "assets/henry/middle.jpg";
 const DOG_SPRITES = {
@@ -1519,7 +1520,11 @@ function loadLevel(index, options = {}) {
 
   resetPlayerPosition();
   const bossHint = levelRuntime.boss ? " Boss first." : "";
-  const musicSrc = levelRuntime.boss ? BOSS_MUSIC : MAIN_MUSIC;
+  const musicSrc = levelRuntime.boss
+    ? BOSS_MUSIC
+    : levelRuntime.id === 1
+      ? LEVEL_ONE_MUSIC
+      : MAIN_MUSIC;
   setBgTrack(musicSrc);
 
   statusEl.textContent = `${levelRuntime.name}: ${state.totalBones} bones.${bossHint}`;
