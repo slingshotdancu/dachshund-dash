@@ -1,6 +1,28 @@
 # Dachshund Dash Changelog
 
+## 2026-06-12
+### Daily improvement: quick-action helper captions are visible again
+- Restored the short helper captions beneath the desktop **Quick actions** buttons so mouse-first players can actually see what **Start**, **Pause**, **Fullscreen**, **Touch controls**, and **Audio** do at a glance.
+- Reused the helper-copy logic that was already in the game code, which means the captions now stay truthful as states change instead of drifting out of sync.
+- Wired the new **Touch controls** toggle into that same helper system, so its caption flips between reveal/hide guidance along with the button label.
+
+![Desktop quick actions showing visible helper captions under Start, Pause, Fullscreen, Touch controls, and Audio](changelog/2026-06-12-quick-action-helper-captions.png)
+
+### Daily improvement: desktop touch controls now stay out of the way until needed
+- Added a new **Show touch controls** quick-action button so desktop players can reveal the on-screen controls only when they actually want them.
+- The large touch-control panel now starts **collapsed by default on desktop**, which keeps the start screen and HUD noticeably cleaner without removing mobile support.
+- The toggle remembers the player’s last choice locally, while touch-first devices still open the panel by default.
+
+![Desktop start screen with the new Show touch controls toggle keeping the touch pad hidden until needed](changelog/2026-06-12-touch-controls-toggle.png)
+
 ## 2026-06-11
+### Art pass: volcano lava now spans the floor and the moon sky now shows Earth
+- Changed the **volcano** stage lava so it stretches across the whole floor hazard zone, leaving safe ground only at the opening platform and the flag platform.
+- Replaced the extra **moon** in the moon-stage sky with an **Earth** backdrop so the scene reads more clearly.
+- Kept both changes visual and local to level presentation/hazard layout.
+
+![Moon level sky now showing Earth instead of a second moon](changelog/2026-06-11-moon-earth-sky.png)
+
 ### Progression pass: first two levels stay normal and a volcano stage now joins the run
 - Moved the special-theme rollout later so **Levels 1 and 2 stay normal**, giving players time to learn the controls before the gimmick stages begin.
 - Shifted the themed progression so the run now introduces **Swim** on Level 3, **Moon** on Level 4, **Volcano** on Level 5, **Big Corgis** on Level 6, and **Lights** on Level 7.

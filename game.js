@@ -10,7 +10,9 @@ const closeLevelSelectEl = document.getElementById("close-level-select");
 const startDesktopBtn = document.getElementById("btn-start-desktop");
 const pauseDesktopBtn = document.getElementById("btn-pause-desktop");
 const fullscreenBtn = document.getElementById("btn-fullscreen");
+const touchControlsBtn = document.getElementById("btn-touch-controls");
 const audioBtn = document.getElementById("btn-audio");
+const mobileControlsPanelEl = document.getElementById("mobile-controls-panel");
 const summaryLevelEl = document.getElementById("summary-level");
 const summaryThemeEl = document.getElementById("summary-theme");
 const summaryBonesEl = document.getElementById("summary-bones");
@@ -117,6 +119,8 @@ const BOSS_DASH_TELEGRAPH_MS = 700;
 const BOSS_DASH_SPEED = 8.2;
 const BOSS_DASH_DURATION_MS = 430;
 
+const TOUCH_CONTROLS_STORAGE_KEY = "dachshund-dash-touch-controls-visible";
+
 function intersects(a, b) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
@@ -126,18 +130,19 @@ function isEnemyAlive(enemy) {
 }
 
 function buildLavaPools(platforms, worldWidth) {
-  const sorted = [...platforms].sort((a, b) => a.x - b.x);
-  const pools = [];
-  for (let i = 0; i < sorted.length - 1; i++) {
-    const current = sorted[i];
-    const next = sorted[i + 1];
-    const gapStart = current.x + current.w;
-    const gapWidth = next.x - gapStart;
-    if (gapWidth >= 70) {
-      pools.push({ x: gapStart, y: LAVA_TOP_Y, w: gapWidth, h: LAVA_HEIGHT });
-    }
-  }
-  return pools.filter((pool) => pool.x < worldWidth - 10);
+  const floorPlatforms = [...platforms]
+    .filter((platform) => platform.y >= 495 && platform.h >= 30)
+    .sort((a, b) => a.x - b.x);
+  if (floorPlatforms.length < 2) return [];
+
+  const startPlatform = floorPlatforms[0];
+  const endPlatform = floorPlatforms[floorPlatforms.length - 1];
+  const lavaStart = startPlatform.x + startPlatform.w;
+  const lavaEnd = endPlatform.x;
+  const lavaWidth = lavaEnd - lavaStart;
+
+  if (lavaWidth < 80) return [];
+  return [{ x: lavaStart, y: LAVA_TOP_Y, w: lavaWidth, h: LAVA_HEIGHT }];
 }
 
 function makeLevelTemplate(levelNum) {
@@ -2153,14 +2158,21 @@ function drawParallax() {
       ctx.fillRect(x, y, i % 3 === 0 ? 3 : 2, i % 3 === 0 ? 3 : 2);
     }
 
-    ctx.fillStyle = "rgba(216, 226, 255, 0.95)";
+    const earthX = canvas.width - 170;
+    const earthY = 92;
+    ctx.fillStyle = "rgba(87, 147, 255, 0.96)";
     ctx.beginPath();
-    ctx.arc(canvas.width - 170, 92, 54, 0, Math.PI * 2);
+    ctx.arc(earthX, earthY, 54, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = "rgba(120, 130, 170, 0.26)";
+    ctx.fillStyle = "rgba(205, 245, 255, 0.18)";
     ctx.beginPath();
-    ctx.arc(canvas.width - 190, 74, 16, 0, Math.PI * 2);
-    ctx.arc(canvas.width - 146, 112, 12, 0, Math.PI * 2);
+    ctx.arc(earthX - 16, earthY - 18, 50, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(92, 196, 122, 0.88)";
+    ctx.beginPath();
+    ctx.ellipse(earthX - 12, earthY - 8, 18, 12, -0.35, 0, Math.PI * 2);
+    ctx.ellipse(earthX + 16, earthY + 10, 15, 10, 0.45, 0, Math.PI * 2);
+    ctx.ellipse(earthX + 4, earthY - 26, 10, 7, 0.1, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.fillStyle = "#6f748c";
@@ -4002,6 +4014,49 @@ if (pauseDesktopBtn) {
   });
 }
 
+function prefersTouchControlsOpenByDefault() {
+  return Boolean(
+    (window.matchMedia && window.matchMedia("(pointer: coarse)").matches) ||
+      navigator.maxTouchPoints > 0
+  );
+}
+
+function setTouchControlsVisible(visible, persist = true) {
+  if (!mobileControlsPanelEl || !touchControlsBtn) return;
+
+  mobileControlsPanelEl.classList.toggle("is-collapsed", !visible);
+  mobileControlsPanelEl.setAttribute("aria-hidden", visible ? "false" : "true");
+  touchControlsBtn.textContent = visible ? "📱 Hide touch controls" : "📱 Show touch controls";
+  touchControlsBtn.classList.toggle("active", visible);
+  touchControlsBtn.setAttribute("aria-label", visible ? "Hide touch controls" : "Show touch controls");
+  touchControlsBtn.setAttribute("aria-expanded", visible ? "true" : "false");
+  const hintEl = touchControlsBtn.parentElement?.querySelector(".utility-btn-hint");
+  if (hintEl) {
+    hintEl.textContent = visible
+      ? "Hide the on-screen controls again once you are done with mouse/touch play."
+      : "Reveal the on-screen controls when you want mouse/touch play.";
+  }
+
+  if (persist) {
+    try {
+      window.localStorage.setItem(TOUCH_CONTROLS_STORAGE_KEY, visible ? "shown" : "hidden");
+    } catch (_) {}
+  }
+}
+
+function initTouchControlsVisibility() {
+  if (!mobileControlsPanelEl || !touchControlsBtn) return;
+
+  let visible = prefersTouchControlsOpenByDefault();
+  try {
+    const saved = window.localStorage.getItem(TOUCH_CONTROLS_STORAGE_KEY);
+    if (saved === "shown") visible = true;
+    if (saved === "hidden") visible = false;
+  } catch (_) {}
+
+  setTouchControlsVisible(visible, false);
+}
+
 function noteJumpTap() {
   state.jumpPressedThisFrame = true;
   state.lastJumpTapAt = Date.now();
@@ -4061,6 +4116,14 @@ if (fullscreenBtn) {
   document.addEventListener("fullscreenchange", updateLabel);
 }
 
+if (touchControlsBtn) {
+  touchControlsBtn.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    const visible = mobileControlsPanelEl?.classList.contains("is-collapsed");
+    setTouchControlsVisible(visible);
+  });
+}
+
 if (audioBtn) {
   audioBtn.addEventListener("pointerdown", (e) => {
     e.preventDefault();
@@ -4068,4 +4131,5 @@ if (audioBtn) {
   });
 }
 
+initTouchControlsVisibility();
 startAfterFonts();

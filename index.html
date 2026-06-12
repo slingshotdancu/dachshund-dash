@@ -34,21 +34,29 @@
           <div class="utility-actions-buttons">
             <div class="utility-action-group">
               <button id="btn-start-desktop" class="utility-btn utility-btn-start" aria-label="Start run from the title screen">Start run</button>
+              <span class="utility-btn-hint">Start from the title screen without using the keyboard</span>
             </div>
             <div class="utility-action-group">
               <button id="btn-pause-desktop" class="utility-btn utility-btn-pause" aria-label="Pause or resume">Pause</button>
+              <span class="utility-btn-hint">Stop or resume a run with a click or press <kbd>P</kbd> / <kbd>Esc</kbd></span>
             </div>
             <div class="utility-action-group">
               <button id="btn-fullscreen" class="utility-btn" aria-label="Toggle fullscreen">⛶ Fullscreen</button>
+              <span class="utility-btn-hint">Stretch the playfield for distraction-free play, then press <kbd>Esc</kbd> to exit.</span>
+            </div>
+            <div class="utility-action-group">
+              <button id="btn-touch-controls" class="utility-btn utility-btn-touch" aria-label="Show touch controls" aria-controls="mobile-controls-panel" aria-expanded="false">📱 Show touch controls</button>
+              <span class="utility-btn-hint">Reveal the on-screen controls when you want mouse/touch play.</span>
             </div>
             <div class="utility-action-group">
               <button id="btn-audio" class="utility-btn utility-btn-audio" aria-label="Mute game audio">🔊 Audio on</button>
+              <span class="utility-btn-hint">Mute music and sound effects with one click or press M</span>
             </div>
           </div>
         </div>
       </section>
 
-      <section class="mobile-controls-panel" aria-label="On-screen controls panel">
+      <section id="mobile-controls-panel" class="mobile-controls-panel" aria-label="On-screen controls panel">
         <div class="mobile-controls" aria-label="On-screen controls">
           <div class="mobile-control-item">
             <button id="btn-left" aria-label="Move left">◀</button>
