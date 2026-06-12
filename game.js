@@ -26,7 +26,7 @@ let dieAudio = null;
 let capeAmbientAudio = null;
 
 const MAIN_MUSIC = "assets/Henry.wav";
-const LEVEL_ONE_MUSIC = "assets/levelone.wav";
+const LEVEL_ONE_MUSIC = ["assets/levelone.wav", "dachshund-dash/assets/levelone.wav"];
 const BOSS_MUSIC = "assets/BossLevels.wav";
 const LOGO_IMG = "assets/henry/middle.jpg";
 const DOG_SPRITES = {
@@ -720,8 +720,25 @@ function startBgMusic() {
 
 function setBgTrack(src) {
   stopBgMusic();
+  const srcList = Array.isArray(src) ? src : [src];
+  const [primarySrc, ...fallbackSrcs] = srcList;
+
   try {
-    bgMusic.audio = new Audio(src);
+    const audio = new Audio(primarySrc);
+    if (fallbackSrcs.length) {
+      audio.addEventListener(
+        "error",
+        () => {
+          const nextSrc = fallbackSrcs.shift();
+          if (!nextSrc) return;
+          audio.src = nextSrc;
+          audio.load();
+          startBgMusic();
+        },
+        { once: true }
+      );
+    }
+    bgMusic.audio = audio;
     bgMusic.started = false;
     startBgMusic();
   } catch (_) {}
