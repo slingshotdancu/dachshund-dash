@@ -19,7 +19,7 @@ const summaryBonesEl = document.getElementById("summary-bones");
 const summaryPowerEl = document.getElementById("summary-power");
 const summaryGoalEl = document.getElementById("summary-goal");
 
-const bgMusic = { audio: null, started: false };
+const bgMusic = { audio: null, started: false, token: 0 };
 let capeAudio = null;
 let tornadoAudio = null;
 let dieAudio = null;
@@ -647,6 +647,15 @@ function openLevelSelect() {
     levelLabel.className = "level-btn-number";
     levelLabel.textContent = `Level ${idx + 1}`;
 
+    const pickupBits = [`${lvl.totalBones} bones`];
+    if (lvl.hearts?.length) pickupBits.push(`${lvl.hearts.length} heart${lvl.hearts.length === 1 ? "" : "s"}`);
+    if (lvl.capes?.length) pickupBits.push(`${lvl.capes.length} cape${lvl.capes.length === 1 ? "" : "s"}`);
+    if (lvl.sirens?.length || lvl.toys?.length) pickupBits.push("toy toss");
+
+    const stats = document.createElement("span");
+    stats.className = "level-btn-stats";
+    stats.textContent = pickupBits.join(" • ");
+
     const badges = [];
     if (lvl.water) badges.push("Swim");
     if (lvl.moon) badges.push("Moon");
@@ -659,10 +668,13 @@ function openLevelSelect() {
 
     const meta = document.createElement("span");
     meta.className = "level-btn-meta";
-    meta.textContent = badges.length ? badges.join(" • ") : "Standard run";
+    meta.textContent = badges.length ? badges.join(" • ") : "Classic run";
 
-    btn.append(levelLabel, meta);
-    btn.setAttribute("aria-label", `${lvl.name}${badges.length ? `, ${badges.join(", ")}` : ""}`);
+    btn.append(levelLabel, stats, meta);
+    btn.setAttribute(
+      "aria-label",
+      `${lvl.name}, ${pickupBits.join(", ")}${badges.length ? `, ${badges.join(", ")}` : ", classic run"}`
+    );
     btn.addEventListener("click", () => {
       closeLevelSelect();
       loadLevel(idx, { resetLives: true });
@@ -707,10 +719,18 @@ function startBgMusic() {
   if (bgMusic.started && bgMusic.audio && !bgMusic.audio.paused) return;
   try {
     const audio = bgMusic.audio || new Audio(MAIN_MUSIC);
+    const token = bgMusic.token;
     audio.loop = true;
     audio.currentTime = 0;
     applyMusicVolume(state.mode === "paused");
     audio.play().then(() => {
+      if (bgMusic.token !== token || bgMusic.audio !== audio) {
+        try {
+          audio.pause();
+          audio.currentTime = 0;
+        } catch (_) {}
+        return;
+      }
       bgMusic.audio = audio;
       bgMusic.started = true;
       applyMusicVolume(state.mode === "paused");
@@ -726,25 +746,23 @@ function setBgTrack(src) {
   try {
     const audio = new Audio(primarySrc);
     if (fallbackSrcs.length) {
-      audio.addEventListener(
-        "error",
-        () => {
-          const nextSrc = fallbackSrcs.shift();
-          if (!nextSrc) return;
-          audio.src = nextSrc;
-          audio.load();
-          startBgMusic();
-        },
-        { once: true }
-      );
+      audio.addEventListener("error", () => {
+        const nextSrc = fallbackSrcs.shift();
+        if (!nextSrc) return;
+        audio.src = nextSrc;
+        audio.load();
+        startBgMusic();
+      });
     }
     bgMusic.audio = audio;
     bgMusic.started = false;
+    bgMusic.token += 1;
     startBgMusic();
   } catch (_) {}
 }
 
 function stopBgMusic() {
+  bgMusic.token += 1;
   try {
     if (bgMusic.audio) {
       bgMusic.audio.pause();
@@ -1551,6 +1569,13 @@ function startGame() {
   resetGame();
 }
 
+function beginLevelPlay() {
+  if (state.mode !== "title") return;
+  state.mode = "playing";
+  const bossHint = levelRuntime.boss ? ` • BOSS LEVEL: ${levelRuntime.boss.name}` : "";
+  statusEl.textContent = `${levelRuntime.name}: Collect ${state.totalBones} bones and reach the flag!${bossHint}`;
+}
+
 function resetGame() {
   loadLevel(0, { resetLives: true });
 }
@@ -1787,9 +1812,7 @@ function update() {
 
   if (state.mode === "title") {
     if (Date.now() >= state.levelTitleUntil) {
-      state.mode = "playing";
-      const bossHint = levelRuntime.boss ? ` • BOSS LEVEL: ${levelRuntime.boss.name}` : "";
-      statusEl.textContent = `${levelRuntime.name}: Collect ${state.totalBones} bones and reach the flag!${bossHint}`;
+      beginLevelPlay();
     }
     return;
   }
@@ -3510,6 +3533,14 @@ function render() {
   const shakeX = shaking ? Math.random() * shaking * 2 - shaking : 0;
   const shakeY = shaking ? Math.random() * shaking * 2 - shaking : 0;
 
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = "source-over";
+  ctx.filter = "none";
+  ctx.shadowColor = "transparent";
+  ctx.shadowBlur = 0;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
   ctx.save();
   ctx.translate(shakeX, shakeY);
 
@@ -3671,6 +3702,11 @@ function render() {
       label = "Resume run";
       hint = "Resume the paused run with a click";
       aria = "Resume paused run";
+      disabled = false;
+    } else if (state.mode === "title") {
+      label = "Start level";
+      hint = "Skip the intro card and start this level right away";
+      aria = "Start current level now";
       disabled = false;
     } else if (state.mode === "dead") {
       label = "Continue";
@@ -3853,10 +3889,17 @@ window.addEventListener("keydown", (e) => {
     return;
   }
 
-  if (state.mode === "start" && ["Space", "Enter", "KeyW", "ArrowUp"].includes(e.code)) {
-    startGame();
-    e.preventDefault();
-    return;
+  if (["Space", "Enter", "KeyW", "ArrowUp"].includes(e.code)) {
+    if (state.mode === "start") {
+      startGame();
+      e.preventDefault();
+      return;
+    }
+    if (state.mode === "title") {
+      beginLevelPlay();
+      e.preventDefault();
+      return;
+    }
   }
 
   if (/^Key[A-Z]$/.test(e.code)) {
@@ -3898,6 +3941,9 @@ canvas.addEventListener("pointerdown", (e) => {
   if (state.mode === "start") {
     e.preventDefault();
     startGame();
+  } else if (state.mode === "title") {
+    e.preventDefault();
+    beginLevelPlay();
   }
 });
 
@@ -3953,6 +3999,8 @@ jumpBtn.addEventListener("pointerdown", (e) => {
   startBgMusic();
   if (state.mode === "start") {
     startGame();
+  } else if (state.mode === "title") {
+    beginLevelPlay();
   } else if (state.mode === "won" || state.mode === "lost" || state.mode === "gameover") {
     resetGame();
   } else if (state.mode === "dead") {
@@ -4014,6 +4062,8 @@ if (startDesktopBtn) {
     startBgMusic();
     if (state.mode === "start") {
       startGame();
+    } else if (state.mode === "title") {
+      beginLevelPlay();
     } else if (state.mode === "paused") {
       resumeGame();
     } else if (state.mode === "dead") {

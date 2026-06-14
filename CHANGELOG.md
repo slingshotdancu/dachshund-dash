@@ -1,5 +1,21 @@
 # Dachshund Dash Changelog
 
+## 2026-06-13
+### Daily improvement: level-intro prompts now actually let players start immediately
+- Fixed a real onboarding mismatch on the per-level intro card: it said **Press Start**, but the prompt did not actually skip into gameplay right away.
+- Players can now begin a level immediately from that intro state using the same inputs the game already teaches: **Enter**, **Space**, **W**, **↑**, touch **▲**, clicking the canvas, or the desktop **Start level** quick-action button.
+- Kept the change local to the intro/start flow, making the prompt truthful without changing level layout, combat, or progression.
+
+![Level 1 intro card with the desktop quick action updated to Start level so mouse-first players can skip straight into the run](changelog/2026-06-13-level-intro-start-button.png)
+
+## 2026-06-13
+### Daily improvement: HENRY level select now previews pickup counts too
+- Upgraded the hidden **HENRY** level-select cards so each level now shows a compact pickup line with its **bone count** plus any **heart**, **cape**, or **toy toss** support before you jump in.
+- Kept the existing theme/special tags underneath, so the secret portal now tells you both **what the level contains** and **what kind of run it is** at a glance.
+- This stays local to the level-select overlay, making it a safe discoverability polish pass without changing gameplay rules.
+
+![HENRY level select showing per-level bone and pickup counts above the existing special-stage tags](changelog/2026-06-13-henry-level-select-stats.png)
+
 ## 2026-06-12
 ### Daily improvement: quick-action helper captions are visible again
 - Restored the short helper captions beneath the desktop **Quick actions** buttons so mouse-first players can actually see what **Start**, **Pause**, **Fullscreen**, **Touch controls**, and **Audio** do at a glance.
