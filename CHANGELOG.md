@@ -1,5 +1,21 @@
 # Dachshund Dash Changelog
 
+## 2026-06-14
+### Daily improvement: touch-control panel now explains the multi-use buttons
+- Added a compact heading to the **On-screen controls** panel so the touch row reads like an intentional control surface instead of a floating button strip.
+- The panel now explicitly teaches that **▲** handles **start / continue / restart** flows and that **BARK** can **quit after wipeouts**, which makes the touch shortcuts truthful before players hit those states.
+- Kept the change local to the shell UI, improving touch discoverability without changing gameplay rules or control bindings.
+
+![Touch controls panel expanded with a new heading that explains the multi-use ▲ and BARK buttons](changelog/2026-06-14-touch-panel-multiuse-hint.png)
+
+## 2026-06-14
+### Daily improvement: start screen now surfaces the most useful shortcuts
+- Added a compact **keyboard tips** strip beside the desktop quick actions so new players can spot movement, jump, bark, dive, restart, and mute inputs without hunting through the README.
+- Restored the hidden **henry** cheat hint and **continue / quit** recovery shortcuts as visible callouts on the start screen, using the UI styles that were already in the stylesheet.
+- Kept the change local to the shell UI, making it a safe onboarding polish pass without touching level layout, physics, or combat balance.
+
+![Start screen showing the new keyboard tips chips plus the visible henry and recovery callouts](changelog/2026-06-14-controls-cheats-and-recovery-panel.png)
+
 ## 2026-06-13
 ### Daily improvement: level-intro prompts now actually let players start immediately
 - Fixed a real onboarding mismatch on the per-level intro card: it said **Press Start**, but the prompt did not actually skip into gameplay right away.
