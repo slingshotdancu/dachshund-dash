@@ -447,9 +447,9 @@ if (LEVELS[8]) {
   LEVELS[8].platforms = [
     { x: 0, y: 500, w: 330, h: 40 },
     { x: 470, y: 500, w: 220, h: 40 },
-    { x: 330, y: 0, w: 70, h: 540 },
+    { x: 330, y: 0, w: 70, h: 220 },
     { x: 400, y: 0, w: 70, h: 260 },
-    { x: 400, y: 360, w: 70, h: 180 },
+    { x: 330, y: 430, w: 140, h: 110 },
     { x: 470, y: 0, w: 2360, h: 180 },
     { x: 470, y: 430, w: 2960, h: 110 },
     { x: 560, y: 250, w: 270, h: 22 },
@@ -493,7 +493,7 @@ if (LEVELS[8]) {
   LEVELS[8].toys = [];
   LEVELS[8].lavaPools = [];
   LEVELS[8].finishFlag = { x: 3340, y: 170, w: 16, h: 260 };
-  LEVELS[8].tunnelEntrance = { x: 360, y: 500, w: 110, h: 40, burstY: 470 };
+  LEVELS[8].tunnelEntrance = { x: 330, y: 500, w: 140, h: 40, burstY: 470 };
   LEVELS[8].boss = null;
 }
 
@@ -2532,6 +2532,46 @@ function drawParallax() {
       ctx.beginPath();
       ctx.ellipse(x, y, 46, 14, ((i % 3) - 1) * 0.18, 0, Math.PI * 2);
       ctx.fill();
+    }
+
+    if (level.tunnelEntrance) {
+      const shaft = level.tunnelEntrance;
+      const shaftX = shaft.x - cam;
+      const shaftCenterX = shaftX + shaft.w / 2;
+      const pulse = 0.72 + Math.sin(Date.now() * 0.01) * 0.12;
+
+      ctx.fillStyle = "rgba(0, 0, 0, 0.24)";
+      ctx.fillRect(shaftX + 8, 432, shaft.w - 16, 108);
+
+      ctx.strokeStyle = "rgba(255, 214, 140, 0.42)";
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(shaftX + 10, 432);
+      ctx.lineTo(shaftX + shaft.w - 10, 432);
+      ctx.stroke();
+
+      for (const sideX of [shaftX + 18, shaftX + shaft.w - 18]) {
+        ctx.fillStyle = `rgba(255, 206, 112, ${0.22 * pulse})`;
+        ctx.beginPath();
+        ctx.arc(sideX, 404, 26, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#f6c56d";
+        ctx.fillRect(sideX - 4, 390, 8, 18);
+        ctx.fillStyle = "#6a4020";
+        ctx.fillRect(sideX - 6, 386, 12, 6);
+      }
+
+      ctx.fillStyle = `rgba(255, 226, 150, ${0.7 * pulse})`;
+      for (let i = 0; i < 3; i++) {
+        const y = 348 + i * 24;
+        ctx.beginPath();
+        ctx.moveTo(shaftCenterX, y + 14);
+        ctx.lineTo(shaftCenterX - 16, y - 6);
+        ctx.lineTo(shaftCenterX + 16, y - 6);
+        ctx.closePath();
+        ctx.fill();
+      }
     }
     return;
   }

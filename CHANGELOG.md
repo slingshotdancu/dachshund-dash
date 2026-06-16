@@ -1,5 +1,20 @@
 # Dachshund Dash Changelog
 
+## 2026-06-16
+### Daily improvement: Level 9 tunnel entrance now has visible drop markers
+- Added glowing **shaft markers** above the Level 9 tunnel entrance so the first drop reads like the intended path instead of a random dirt wall.
+- Framed the opening with warm lanterns, a brighter shaft rim, and animated down-pointing chevrons to teach the route without adding more words to the screen.
+- Verified with `node --check game.js` and a Playwright browser capture of Level 9 showing the new entrance markers in place.
+
+![Level 9 entrance now marked by lanterns and glowing down arrows above the tunnel drop](changelog/2026-06-16-level-9-entrance-markers.png)
+
+### Daily improvement: Level 9 tunnel entrance now has a real landing floor
+- Carved the blocked Level 9 opener into a true **drop shaft** with a matching floor underneath it, so Henry can actually enter the underground tunnel instead of falling into a dead-start trap.
+- Widened the tunnel entrance trigger to cover the full opening, keeping the dirt-burst moment aligned with the playable shaft.
+- Verified with `node --check game.js` and a small Playwright state check that dropping Henry into the entrance now settles him safely onto the new floor inside the tunnel.
+
+![Close-up of Level 9 showing the newly opened tunnel entrance drop shaft near the start](changelog/2026-06-16-level-9-open-shaft-detail.png)
+
 ## 2026-06-15
 ### Follow-up audio tweak: giant corgis stage now uses its own track
 - Changed the giant corgis level music so that stage now plays **`assets/giantlevel.wav`** instead of falling back to the standard run track.
