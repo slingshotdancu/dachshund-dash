@@ -25,6 +25,16 @@ cd /Users/danieljobe/.openclaw/workspace/projects/dachshund-dash
 npx serve .
 ```
 
+### Option C (HTTPS for iPhone tilt controls)
+```bash
+cd /Users/danieljobe/.openclaw/workspace/projects/dachshund-dash
+./scripts/run-https.sh
+```
+
+This starts a local HTTPS server on port `8443`, generates a local certificate in `.cert/`, and prints the exact iPhone URL to open.
+
+If iPhone Safari warns about the certificate, install and trust `.cert/cert.pem` on the phone first. Once trusted, open the printed `https://<your-mac-ip>:8443` URL in Safari so motion/tilt APIs can run in a secure context.
+
 ## Controls and mechanics summary
 
 ### Controls

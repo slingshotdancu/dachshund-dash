@@ -12,6 +12,14 @@
 
       <canvas id="game" width="960" height="540" aria-label="Dachshund Dash game area"></canvas>
 
+      <section id="mobile-immersive-overlay" class="mobile-immersive-overlay hidden" aria-live="polite">
+        <div class="mobile-immersive-card">
+          <strong id="mobile-immersive-title" class="mobile-immersive-title">Rotate to landscape</strong>
+          <p id="mobile-immersive-message" class="mobile-immersive-message">Turn your phone sideways for the best view.</p>
+          <button id="mobile-enable-motion" class="mobile-enable-motion hidden" type="button">Enable tilt + fullscreen</button>
+        </div>
+      </section>
+
       <section class="hud" aria-live="polite">
         <span id="status">Ready.</span>
         <div id="lives" class="lives" aria-label="Continues 3 of 3">

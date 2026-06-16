@@ -1,5 +1,9 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
+const mobileOverlayEl = document.getElementById("mobile-immersive-overlay");
+const mobileOverlayTitleEl = document.getElementById("mobile-immersive-title");
+const mobileOverlayMessageEl = document.getElementById("mobile-immersive-message");
+const mobileMotionBtn = document.getElementById("mobile-enable-motion");
 const statusEl = document.getElementById("status");
 const livesEl = document.getElementById("lives"); // shows lives/continues as dog heads
 const livesIconsEl = document.getElementById("lives-icons");
@@ -19,7 +23,7 @@ const summaryBonesEl = document.getElementById("summary-bones");
 const summaryPowerEl = document.getElementById("summary-power");
 const summaryGoalEl = document.getElementById("summary-goal");
 
-const bgMusic = { audio: null, started: false, token: 0 };
+const bgMusic = { handle: null, started: false, token: 0, src: null, loadingToken: null };
 let capeAudio = null;
 let tornadoAudio = null;
 let dieAudio = null;
@@ -28,6 +32,9 @@ let capeAmbientAudio = null;
 const MAIN_MUSIC = "assets/Henry.wav";
 const LEVEL_ONE_MUSIC = ["assets/levelone.wav", "dachshund-dash/assets/levelone.wav"];
 const BOSS_MUSIC = "assets/BossLevels.wav";
+const LAVA_LEVEL_MUSIC = "assets/lavalevel.wav";
+const WATER_LEVEL_MUSIC = "assets/waterlevel.wav";
+const GIANT_LEVEL_MUSIC = "assets/giantlevel.wav";
 const LOGO_IMG = "assets/henry/middle.jpg";
 const DOG_SPRITES = {
   left: [
@@ -52,6 +59,8 @@ const WATER_MAX_VX = 2.4;
 const MOON_GRAVITY_FACTOR = 0.3;
 const MOON_JUMP_VELOCITY_FACTOR = 0.88;
 const MOON_MAX_FALL_SPEED = 6;
+const CLOUD_PLATFORM_HOLD_MS = 2200;
+const CLOUD_PLATFORM_RESPAWN_MS = 3200;
 const DARK_SWITCH_REVEAL_MS = 5000;
 const LAVA_TOP_Y = 510;
 const LAVA_HEIGHT = 30;
@@ -121,6 +130,9 @@ const BOSS_DASH_SPEED = 8.2;
 const BOSS_DASH_DURATION_MS = 430;
 
 const TOUCH_CONTROLS_STORAGE_KEY = "dachshund-dash-touch-controls-visible";
+const MOBILE_SWIPE_JUMP_MIN = 34;
+const MOBILE_TAP_JUMP_MAX_MS = 220;
+const MOBILE_DOUBLE_TAP_MS = 280;
 
 function intersects(a, b) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
@@ -128,6 +140,10 @@ function intersects(a, b) {
 
 function isEnemyAlive(enemy) {
   return !enemy.dead && !enemy.dying;
+}
+
+function isPlatformSolid(platform) {
+  return platform.active !== false;
 }
 
 function buildLavaPools(platforms, worldWidth) {
@@ -378,6 +394,120 @@ if (LEVELS[6]) {
     { x: 2480, y: 282, w: 26, h: 42, on: false },
   ];
 }
+if (LEVELS[7]) {
+  LEVELS[7].cloud = true;
+  LEVELS[7].worldWidth = 3500;
+  LEVELS[7].totalBones = 8;
+  LEVELS[7].platforms = [
+    { x: 0, y: 500, w: 360, h: 40, cloudPuffs: 5 },
+    { x: 430, y: 452, w: 180, h: 24, cloudPuffs: 4 },
+    { x: 650, y: 402, w: 150, h: 22, cloudPuffs: 4, cloudVanish: true },
+    { x: 860, y: 350, w: 190, h: 24, cloudPuffs: 5 },
+    { x: 1080, y: 294, w: 140, h: 22, cloudPuffs: 4, cloudVanish: true },
+    { x: 1290, y: 344, w: 200, h: 24, cloudPuffs: 5 },
+    { x: 1530, y: 402, w: 150, h: 22, cloudPuffs: 4, cloudVanish: true },
+    { x: 1740, y: 352, w: 200, h: 24, cloudPuffs: 5 },
+    { x: 1980, y: 298, w: 150, h: 22, cloudPuffs: 4, cloudVanish: true },
+    { x: 2190, y: 342, w: 210, h: 24, cloudPuffs: 5 },
+    { x: 2440, y: 392, w: 150, h: 22, cloudPuffs: 4, cloudVanish: true },
+    { x: 2660, y: 334, w: 210, h: 24, cloudPuffs: 5 },
+    { x: 2900, y: 278, w: 150, h: 22, cloudPuffs: 4, cloudVanish: true },
+    { x: 3110, y: 330, w: 180, h: 24, cloudPuffs: 5 },
+    { x: 3330, y: 430, w: 170, h: 36, cloudPuffs: 5 },
+  ];
+  LEVELS[7].spikes = [];
+  LEVELS[7].enemies = [
+    { x: 470, y: 422, w: 38, h: 30, dir: 1, minX: 445, maxX: 565, speed: 2.15 },
+    { x: 1335, y: 314, w: 38, h: 30, dir: -1, minX: 1310, maxX: 1450, speed: 2.25 },
+    { x: 1790, y: 322, w: 38, h: 30, dir: 1, minX: 1760, maxX: 1900, speed: 2.35 },
+    { x: 2715, y: 304, w: 38, h: 30, dir: -1, minX: 2680, maxX: 2820, speed: 2.45 },
+  ];
+  LEVELS[7].bones = [
+    { x: 290, y: 450, r: 11 },
+    { x: 700, y: 360, r: 11 },
+    { x: 915, y: 308, r: 11 },
+    { x: 1338, y: 302, r: 11 },
+    { x: 1585, y: 360, r: 11 },
+    { x: 2025, y: 256, r: 11 },
+    { x: 2695, y: 292, r: 11 },
+    { x: 3160, y: 288, r: 11 },
+  ];
+  LEVELS[7].hearts = [{ x: 2225, y: 304, w: 24, h: 24 }];
+  LEVELS[7].capes = [];
+  LEVELS[7].sirens = [];
+  LEVELS[7].toys = [];
+  LEVELS[7].lavaPools = [];
+  LEVELS[7].finishFlag = { x: 3440, y: 350, w: 16, h: 120 };
+  LEVELS[7].boss = null;
+}
+if (LEVELS[8]) {
+  LEVELS[8].tunnel = true;
+  LEVELS[8].worldWidth = 3400;
+  LEVELS[8].totalBones = 8;
+  LEVELS[8].platforms = [
+    { x: 0, y: 500, w: 330, h: 40 },
+    { x: 470, y: 500, w: 220, h: 40 },
+    { x: 330, y: 0, w: 70, h: 540 },
+    { x: 400, y: 0, w: 70, h: 260 },
+    { x: 400, y: 360, w: 70, h: 180 },
+    { x: 470, y: 0, w: 2360, h: 180 },
+    { x: 470, y: 430, w: 2960, h: 110 },
+    { x: 560, y: 250, w: 270, h: 22 },
+    { x: 900, y: 330, w: 250, h: 22 },
+    { x: 1210, y: 250, w: 310, h: 22 },
+    { x: 1560, y: 330, w: 260, h: 22 },
+    { x: 1880, y: 250, w: 290, h: 22 },
+    { x: 2230, y: 330, w: 260, h: 22 },
+    { x: 2550, y: 250, w: 300, h: 22 },
+    { x: 2910, y: 330, w: 240, h: 22 },
+    { x: 3170, y: 250, w: 150, h: 22 },
+    { x: 830, y: 180, w: 70, h: 100 },
+    { x: 1450, y: 272, w: 80, h: 80 },
+    { x: 2140, y: 180, w: 80, h: 80 },
+    { x: 2810, y: 272, w: 80, h: 80 },
+  ];
+  LEVELS[8].spikes = [];
+  LEVELS[8].enemies = [
+    { x: 610, y: 220, w: 42, h: 28, dir: 1, minX: 580, maxX: 800, speed: 1.55, kind: "mole" },
+    { x: 980, y: 300, w: 34, h: 24, dir: -1, minX: 930, maxX: 1120, speed: 1.9, kind: "mouse" },
+    { x: 1280, y: 220, w: 42, h: 28, dir: 1, minX: 1240, maxX: 1480, speed: 1.6, kind: "mole" },
+    { x: 1670, y: 300, w: 34, h: 24, dir: -1, minX: 1600, maxX: 1790, speed: 1.95, kind: "mouse" },
+    { x: 1950, y: 220, w: 42, h: 28, dir: 1, minX: 1910, maxX: 2140, speed: 1.65, kind: "mole" },
+    { x: 2300, y: 300, w: 34, h: 24, dir: -1, minX: 2260, maxX: 2460, speed: 2.0, kind: "mouse" },
+    { x: 2610, y: 220, w: 42, h: 28, dir: 1, minX: 2580, maxX: 2820, speed: 1.7, kind: "mole" },
+    { x: 2980, y: 300, w: 34, h: 24, dir: -1, minX: 2940, maxX: 3120, speed: 2.05, kind: "mouse" },
+  ];
+  LEVELS[8].bones = [
+    { x: 250, y: 450, r: 11 },
+    { x: 520, y: 470, r: 11 },
+    { x: 690, y: 210, r: 11 },
+    { x: 1040, y: 290, r: 11 },
+    { x: 1380, y: 210, r: 11 },
+    { x: 2050, y: 210, r: 11 },
+    { x: 2700, y: 210, r: 11 },
+    { x: 3200, y: 210, r: 11 },
+  ];
+  LEVELS[8].hearts = [{ x: 2420, y: 290, w: 24, h: 24 }];
+  LEVELS[8].capes = [];
+  LEVELS[8].sirens = [];
+  LEVELS[8].toys = [];
+  LEVELS[8].lavaPools = [];
+  LEVELS[8].finishFlag = { x: 3340, y: 170, w: 16, h: 260 };
+  LEVELS[8].tunnelEntrance = { x: 360, y: 500, w: 110, h: 40, burstY: 470 };
+  LEVELS[8].boss = null;
+}
+
+const mobileControlState = {
+  enabled: false,
+  immersive: false,
+  landscape: false,
+  activeTouches: new Map(),
+  movementTouchId: null,
+  movementSide: null,
+  jumpReleaseTimeout: null,
+  lastCenterTapAt: 0,
+  centerTapTimeout: null,
+};
 
 const state = {
   mode: "start",
@@ -431,6 +561,8 @@ const state = {
   sirenOverlayUntil: 0,
   toyHeld: false,
   toyProjectile: null,
+  dirtBursts: [],
+  tunnelBurstDone: false,
   dog: {
     x: START_X,
     y: START_Y,
@@ -455,6 +587,26 @@ function defeatEnemy(enemy, horizontalPush = 0) {
 
 function barkReady() {
   return Date.now() >= state.combat.barkCooldownUntil;
+}
+
+function spawnTunnelDirtBurst(entrance) {
+  const burstX = entrance.x + entrance.w / 2;
+  const burstY = entrance.burstY ?? entrance.y;
+  for (let i = 0; i < 28; i++) {
+    const angle = -Math.PI + Math.random() * Math.PI;
+    const speed = 2 + Math.random() * 5.5;
+    state.dirtBursts.push({
+      x: burstX + (Math.random() - 0.5) * entrance.w * 0.7,
+      y: burstY + Math.random() * 16,
+      vx: Math.cos(angle) * speed * 0.8,
+      vy: Math.sin(angle) * speed - 1.8,
+      r: 4 + Math.random() * 6,
+      bornAt: Date.now(),
+      life: 700 + Math.random() * 260,
+      color: i % 3 === 0 ? "#7f5632" : i % 2 === 0 ? "#9e7245" : "#5f3e24",
+    });
+  }
+  state.digUntil = Date.now() + 850;
 }
 
 function renderLives() {
@@ -524,6 +676,8 @@ function runSummaryTheme(level = levelRuntime) {
   const labels = [];
   if (level?.water) labels.push("Swim");
   if (level?.moon) labels.push("Moon");
+  if (level?.cloud) labels.push("Clouds");
+  if (level?.tunnel) labels.push("Tunnel");
   if (level?.volcano) labels.push("Volcano");
   if (level?.giantEnemies) labels.push("Big Corgis");
   if (level?.dark) labels.push("Lights");
@@ -535,7 +689,7 @@ function runSummaryTheme(level = levelRuntime) {
   let tone = "theme";
   if (level?.dark) tone = "warning";
   else if (level?.volcano || level?.giantEnemies) tone = "boss";
-  else if (level?.water || level?.moon) tone = "boost";
+  else if (level?.water || level?.moon || level?.cloud || level?.tunnel) tone = "boost";
 
   return { text: `Stage ${labels.join(" · ")}`, tone };
 }
@@ -659,6 +813,8 @@ function openLevelSelect() {
     const badges = [];
     if (lvl.water) badges.push("Swim");
     if (lvl.moon) badges.push("Moon");
+    if (lvl.cloud) badges.push("Clouds");
+    if (lvl.tunnel) badges.push("Tunnel");
     if (lvl.volcano) badges.push("Volcano");
     if (lvl.giantEnemies) badges.push("Big Corgis");
     if (lvl.dark) badges.push("Lights");
@@ -702,6 +858,92 @@ function getImage(src) {
 }
 
 let audioCtx = null;
+let audioUnlocked = false;
+const audioBufferCache = new Map();
+
+function preferredAudioSources(src) {
+  const list = Array.isArray(src) ? src : [src];
+  if (!mobileControlState.enabled) return list;
+  const out = [];
+  for (const item of list) {
+    if (typeof item === "string" && item.endsWith(".wav")) {
+      out.push(item.replace(/\.wav$/i, ".m4a"));
+    }
+    out.push(item);
+  }
+  return [...new Set(out)];
+}
+
+function stopAudioHandle(handle) {
+  if (!handle) return;
+  try {
+    handle.source?.stop();
+  } catch (_) {}
+  try {
+    handle.source?.disconnect();
+    handle.gain?.disconnect();
+  } catch (_) {}
+}
+
+function unlockAudio() {
+  try {
+    audioCtx ||= new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx?.state === "suspended" && audioCtx.resume) audioCtx.resume().catch(() => {});
+    audioUnlocked = true;
+  } catch (_) {
+    audioUnlocked = false;
+  }
+}
+
+async function loadAudioBuffer(src) {
+  const candidates = preferredAudioSources(src);
+  const cacheKey = candidates.join("|");
+  if (!audioBufferCache.has(cacheKey)) {
+    audioBufferCache.set(
+      cacheKey,
+      (async () => {
+        unlockAudio();
+        for (const candidate of candidates) {
+          try {
+            const res = await fetch(candidate);
+            if (!res.ok) continue;
+            const arrayBuffer = await res.arrayBuffer();
+            const buffer = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
+            return { buffer, src: candidate };
+          } catch (_) {}
+        }
+        throw new Error(`Failed to load audio: ${candidates.join(", ")}`);
+      })()
+    );
+  }
+  return audioBufferCache.get(cacheKey);
+}
+
+async function playBufferedSound(src, { volume = 1, loop = false } = {}) {
+  unlockAudio();
+  if (!audioCtx || AUDIO.muted) return null;
+  try {
+    const { buffer, src: resolvedSrc } = await loadAudioBuffer(src);
+    const source = audioCtx.createBufferSource();
+    const gain = audioCtx.createGain();
+    source.buffer = buffer;
+    source.loop = loop;
+    gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+    source.connect(gain);
+    gain.connect(audioCtx.destination);
+    source.start();
+    return {
+      source,
+      gain,
+      src: resolvedSrc,
+      stop() {
+        stopAudioHandle({ source, gain });
+      },
+    };
+  } catch (_) {
+    return null;
+  }
+}
 
 function musicVolume(paused = false) {
   if (AUDIO.muted) return 0;
@@ -711,69 +953,53 @@ function musicVolume(paused = false) {
 }
 
 function applyMusicVolume(paused = false) {
-  if (bgMusic.audio) bgMusic.audio.volume = musicVolume(paused);
+  if (bgMusic.handle?.gain && audioCtx) {
+    bgMusic.handle.gain.gain.setValueAtTime(musicVolume(paused), audioCtx.currentTime);
+  }
 }
 
 function startBgMusic() {
-  if (capeAmbientAudio) return; // mute bg music while cape ambient is active
-  if (bgMusic.started && bgMusic.audio && !bgMusic.audio.paused) return;
-  try {
-    const audio = bgMusic.audio || new Audio(MAIN_MUSIC);
-    const token = bgMusic.token;
-    audio.loop = true;
-    audio.currentTime = 0;
+  unlockAudio();
+  if (capeAmbientAudio) return;
+  if ((bgMusic.started && bgMusic.handle) || bgMusic.loadingToken === bgMusic.token) return;
+  const token = bgMusic.token;
+  bgMusic.loadingToken = token;
+  playBufferedSound(bgMusic.src || MAIN_MUSIC, { volume: musicVolume(state.mode === "paused"), loop: true }).then((handle) => {
+    if (bgMusic.loadingToken === token) bgMusic.loadingToken = null;
+    if (!handle) return;
+    if (bgMusic.token !== token) {
+      handle.stop();
+      return;
+    }
+    if (bgMusic.handle) bgMusic.handle.stop();
+    bgMusic.handle = handle;
+    bgMusic.started = true;
     applyMusicVolume(state.mode === "paused");
-    audio.play().then(() => {
-      if (bgMusic.token !== token || bgMusic.audio !== audio) {
-        try {
-          audio.pause();
-          audio.currentTime = 0;
-        } catch (_) {}
-        return;
-      }
-      bgMusic.audio = audio;
-      bgMusic.started = true;
-      applyMusicVolume(state.mode === "paused");
-    }).catch(() => {});
-  } catch (_) {}
+  }).catch(() => {
+    if (bgMusic.loadingToken === token) bgMusic.loadingToken = null;
+  });
 }
 
 function setBgTrack(src) {
   stopBgMusic();
-  const srcList = Array.isArray(src) ? src : [src];
-  const [primarySrc, ...fallbackSrcs] = srcList;
-
-  try {
-    const audio = new Audio(primarySrc);
-    if (fallbackSrcs.length) {
-      audio.addEventListener("error", () => {
-        const nextSrc = fallbackSrcs.shift();
-        if (!nextSrc) return;
-        audio.src = nextSrc;
-        audio.load();
-        startBgMusic();
-      });
-    }
-    bgMusic.audio = audio;
-    bgMusic.started = false;
-    bgMusic.token += 1;
-    startBgMusic();
-  } catch (_) {}
+  bgMusic.src = src;
+  bgMusic.started = false;
+  bgMusic.token += 1;
+  startBgMusic();
 }
 
 function stopBgMusic() {
   bgMusic.token += 1;
-  try {
-    if (bgMusic.audio) {
-      bgMusic.audio.pause();
-      bgMusic.audio.currentTime = 0;
-    }
-  } catch (_) {}
+  bgMusic.loadingToken = null;
+  if (bgMusic.handle) bgMusic.handle.stop();
+  bgMusic.handle = null;
   bgMusic.started = false;
 }
 
 function setBgVolume(vol) {
-  if (bgMusic.audio) bgMusic.audio.volume = AUDIO.muted ? 0 : vol;
+  if (bgMusic.handle?.gain && audioCtx) {
+    bgMusic.handle.gain.gain.setValueAtTime(AUDIO.muted ? 0 : vol, audioCtx.currentTime);
+  }
 }
 
 function toggleAudioMute() {
@@ -836,6 +1062,7 @@ function confirmPauseSelection() {
 
 function tone(freq = 440, ms = 120, type = "square", vol = 0.03, slideTo = null) {
   try {
+    unlockAudio();
     audioCtx ||= new (window.AudioContext || window.webkitAudioContext)();
     const ctxA = audioCtx;
     const osc = ctxA.createOscillator();
@@ -860,68 +1087,39 @@ function playUnlockSound() {
 }
 
 function playSecretSound() {
-  try {
-    if (bgMusic.audio) bgMusic.audio.pause();
-    const audio = new Audio("assets/Secret.wav");
-    audio.volume = sfxVolume(0.7);
-    audio.play().catch(() => {});
-  } catch (_) {}
+  stopBgMusic();
+  playBufferedSound("assets/Secret.wav", { volume: sfxVolume(0.7) });
 }
 
 function playBoneSound() {
-  try {
-    const audio = new Audio("assets/Bone.wav");
-    audio.volume = sfxVolume(0.6);
-    audio.play().catch(() => {});
-  } catch (_) {}
+  playBufferedSound("assets/Bone.wav", { volume: sfxVolume(0.6) });
 }
 
 function playJumpSound() {
-  try {
-    if (AUDIO.sfxMuted) return;
-    const audio = new Audio("assets/Jump.wav");
-    audio.volume = 0.55;
-    audio.play().catch(() => {});
-  } catch (_) {}
+  playBufferedSound("assets/Jump.wav", { volume: sfxVolume(0.55) });
 }
 
 function playAirJumpSound() {
-  try {
-    const audio = new Audio("assets/Jump2.wav");
-    audio.volume = sfxVolume(0.55);
-    audio.play().catch(() => {});
-  } catch (_) {}
+  playBufferedSound("assets/Jump2.wav", { volume: sfxVolume(0.55) });
 }
 
 function playKillSound() {
-  try {
-    const audio = new Audio("assets/Kill.wav");
-    audio.volume = sfxVolume(0.55);
-    audio.play().catch(() => {});
-  } catch (_) {}
+  playBufferedSound("assets/Kill.wav", { volume: sfxVolume(0.55) });
 }
 
 function stopDieSound() {
-  try {
-    if (dieAudio) {
-      dieAudio.pause();
-      dieAudio.currentTime = 0;
-    }
-  } catch (_) {}
+  if (dieAudio) dieAudio.stop();
   dieAudio = null;
 }
 
 function playDieSound() {
-  try {
-    stopDieSound();
-    stopBgMusic();
-    stopCapeSound();
-    stopTornadoSound();
-    const audio = new Audio("assets/Die.wav");
-    audio.volume = sfxVolume(0.65);
-    audio.play().catch(() => {});
-    dieAudio = audio;
-  } catch (_) {}
+  stopDieSound();
+  stopBgMusic();
+  stopCapeSound();
+  stopTornadoSound();
+  playBufferedSound("assets/Die.wav", { volume: sfxVolume(0.65) }).then((handle) => {
+    dieAudio = handle;
+  });
 }
 
 function sfxVolume(base = 1) {
@@ -930,43 +1128,23 @@ function sfxVolume(base = 1) {
 }
 
 function playHeartSound() {
-  try {
-    const audio = new Audio("assets/Heart.wav");
-    audio.volume = sfxVolume(0.55);
-    audio.play().catch(() => {});
-  } catch (_) {}
+  playBufferedSound("assets/Heart.wav", { volume: sfxVolume(0.55) });
 }
 
 function playSneezeSound() {
-  try {
-    const audio = new Audio("assets/Sneeze.wav");
-    audio.volume = sfxVolume(0.6);
-    audio.play().catch(() => {});
-  } catch (_) {}
+  playBufferedSound("assets/Sneeze.wav", { volume: sfxVolume(0.6) });
 }
 
 function playPauseEnterSound() {
-  try {
-    const audio = new Audio("assets/pause1.wav");
-    audio.volume = sfxVolume(0.6);
-    audio.play().catch(() => {});
-  } catch (_) {}
+  playBufferedSound("assets/pause1.wav", { volume: sfxVolume(0.6) });
 }
 
 function playPauseExitSound() {
-  try {
-    const audio = new Audio("assets/pause2.wav");
-    audio.volume = sfxVolume(0.6);
-    audio.play().catch(() => {});
-  } catch (_) {}
+  playBufferedSound("assets/pause2.wav", { volume: sfxVolume(0.6) });
 }
 
 function playShortBarkSound() {
-  try {
-    const audio = new Audio("assets/Bark.wav");
-    audio.volume = sfxVolume(0.7);
-    audio.play().catch(() => {});
-  } catch (_) {}
+  playBufferedSound("assets/Bark.wav", { volume: sfxVolume(0.7) });
 }
 
 function playBarkSound(strong = true) {
@@ -979,94 +1157,54 @@ function playBarkSound(strong = true) {
 }
 
 function playSuperBarkSound() {
-  try {
-    const audio = new Audio("assets/Superbark.wav");
-    audio.volume = sfxVolume(0.65);
-    audio.play().catch(() => {});
-  } catch (_) {}
+  playBufferedSound(["assets/Superbark.m4a", "assets/Superbark.wav"], { volume: sfxVolume(0.65) });
 }
 
 function stopCapeSound() {
-  try {
-    if (capeAudio) {
-      capeAudio.pause();
-      capeAudio.currentTime = 0;
-    }
-  } catch (_) {}
+  if (capeAudio) capeAudio.stop();
   capeAudio = null;
 }
 
 function stopTornadoSound() {
-  try {
-    if (tornadoAudio) {
-      tornadoAudio.pause();
-      tornadoAudio.currentTime = 0;
-    }
-  } catch (_) {}
+  if (tornadoAudio) tornadoAudio.stop();
   tornadoAudio = null;
 }
 
 function playTornadoSound() {
-  try {
-    if (tornadoAudio) return;
-    const audio = new Audio("assets/Tornado.wav");
-    audio.loop = true;
-    audio.volume = sfxVolume(0.55);
-    audio.play().then(() => {
-      tornadoAudio = audio;
-    }).catch(() => {});
-  } catch (_) {}
+  if (tornadoAudio) return;
+  playBufferedSound("assets/Tornado.wav", { volume: sfxVolume(0.55), loop: true }).then((handle) => {
+    tornadoAudio = handle;
+  });
 }
 
 function stopCapeAmbient() {
-  try {
-    if (capeAmbientAudio) {
-      capeAmbientAudio.pause();
-      capeAmbientAudio.currentTime = 0;
-    }
-  } catch (_) {}
+  if (capeAmbientAudio) capeAmbientAudio.stop();
   capeAmbientAudio = null;
 }
 
 function playCapeAmbient() {
-  try {
-    stopCapeAmbient();
-    stopBgMusic();
-    const audio = new Audio("assets/water.wav");
-    audio.loop = true;
-    audio.volume = sfxVolume(0.35);
-    audio.play().catch(() => {});
-    capeAmbientAudio = audio;
-  } catch (_) {}
+  stopCapeAmbient();
+  stopBgMusic();
+  playBufferedSound("assets/water.wav", { volume: sfxVolume(0.35), loop: true }).then((handle) => {
+    capeAmbientAudio = handle;
+  });
 }
 
 function playCapeSound() {
-  try {
-    stopCapeSound();
-    const audio = new Audio("assets/Supergrowl.wav");
-    audio.volume = sfxVolume(0.55);
-    audio.play().catch(() => {});
-    capeAudio = audio;
-  } catch (_) {}
+  stopCapeSound();
+  playBufferedSound(["assets/Supergrowl.m4a", "assets/Supergrowl.wav"], { volume: sfxVolume(0.55) }).then((handle) => {
+    capeAudio = handle;
+  });
 }
 
 function playLevelClearSound() {
-  try {
-    const src = "assets/Superbark.wav";
-    const playChain = (remaining) => {
-      if (remaining <= 0) return;
-      const audio = new Audio(src);
-      audio.volume = sfxVolume(0.6);
-      audio.onended = () => playChain(remaining - 1);
-      audio.play().catch(() => {});
-    };
-    playChain(2);
-  } catch (_) {}
+  playBufferedSound(["assets/Superbark.m4a", "assets/Superbark.wav"], { volume: sfxVolume(0.6) });
 }
 
 function resolvePlayerPenetration(level) {
   const dog = state.dog;
   for (const p of level.platforms) {
+    if (!isPlatformSolid(p)) continue;
     if (!intersects(dog, p)) continue;
 
     const overlapLeft = dog.x + dog.w - p.x;
@@ -1093,6 +1231,38 @@ function resolvePlayerPenetration(level) {
   }
 
   dog.x = Math.max(0, Math.min(level.worldWidth - dog.w, dog.x));
+}
+
+function updateCloudPlatforms(level, now, supportingPlatform) {
+  if (!level.cloud) return false;
+
+  let collapsedUnderDog = false;
+  for (const p of level.platforms) {
+    if (!p.cloudVanish) continue;
+
+    if (p.active === false) {
+      if (now >= (p.respawnAt || 0)) {
+        p.active = true;
+        p.occupiedSince = 0;
+        p.respawnAt = 0;
+      }
+      continue;
+    }
+
+    if (p === supportingPlatform) {
+      if (!p.occupiedSince) p.occupiedSince = now;
+      if (now - p.occupiedSince >= CLOUD_PLATFORM_HOLD_MS) {
+        p.active = false;
+        p.occupiedSince = 0;
+        p.respawnAt = now + CLOUD_PLATFORM_RESPAWN_MS;
+        collapsedUnderDog = true;
+      }
+    } else {
+      p.occupiedSince = 0;
+    }
+  }
+
+  return collapsedUnderDog;
 }
 
 function applyHitKnockback() {
@@ -1163,11 +1333,7 @@ function quitToStart() {
 }
 
 function playHitSound() {
-  try {
-    const audio = new Audio("assets/hit.wav");
-    audio.volume = sfxVolume(0.65);
-    audio.play().catch(() => {});
-  } catch (_) {}
+  playBufferedSound("assets/hit.wav", { volume: sfxVolume(0.65) });
 }
 
 function spawnBarkWave(mode = "forward") {
@@ -1284,7 +1450,7 @@ function hydrateLevelRuntime(level) {
     })),
     spikes: level.spikes.map((s) => ({ ...s })),
     lavaPools: (level.lavaPools || []).map((pool) => ({ ...pool })),
-    platforms: level.platforms.map((p) => ({ ...p })),
+    platforms: level.platforms.map((p) => ({ ...p, active: p.active ?? true, occupiedSince: 0, respawnAt: 0 })),
     finishFlag: { ...level.finishFlag },
     boss,
     sirens: (level.sirens || []).map((s) => ({ ...s })),
@@ -1322,6 +1488,8 @@ function resetPlayerPosition() {
   state.jumpHeld = false;
   state.jumpHoldStartedAt = 0;
   state.jumpBufferedUntil = 0;
+  state.dirtBursts = [];
+  state.tunnelBurstDone = false;
 }
 
 function bossStatusText(level) {
@@ -1512,6 +1680,14 @@ function drawLevelPreviewCard(x, y, level) {
 function loadLevel(index, options = {}) {
   const { resetLives = false, preserveRespawns = false } = options;
 
+  if (mobileControlState.enabled) {
+    resetMobileTrackedTouches();
+    clearMobileDirectionalInput();
+    clearMobileJumpReleaseTimeout();
+    clearMobileCenterTapTimeout();
+    mobileControlState.lastCenterTapAt = 0;
+    handleJumpRelease();
+  }
   state.currentLevelIndex = index;
   state.mode = "title";
   state.levelTitleUntil = Date.now() + LEVEL_TITLE_MS;
@@ -1559,7 +1735,13 @@ function loadLevel(index, options = {}) {
     ? BOSS_MUSIC
     : levelRuntime.id === 1
       ? LEVEL_ONE_MUSIC
-      : MAIN_MUSIC;
+      : levelRuntime.water
+        ? WATER_LEVEL_MUSIC
+        : levelRuntime.volcano
+          ? LAVA_LEVEL_MUSIC
+          : levelRuntime.giantEnemies
+            ? GIANT_LEVEL_MUSIC
+            : MAIN_MUSIC;
   setBgTrack(musicSrc);
 
   statusEl.textContent = `${levelRuntime.name}: ${state.totalBones} bones.${bossHint}`;
@@ -1571,6 +1753,14 @@ function startGame() {
 
 function beginLevelPlay() {
   if (state.mode !== "title") return;
+  if (mobileControlState.enabled) {
+    resetMobileTrackedTouches();
+    clearMobileDirectionalInput();
+    clearMobileJumpReleaseTimeout();
+    clearMobileCenterTapTimeout();
+    mobileControlState.lastCenterTapAt = 0;
+    handleJumpRelease();
+  }
   state.mode = "playing";
   const bossHint = levelRuntime.boss ? ` • BOSS LEVEL: ${levelRuntime.boss.name}` : "";
   statusEl.textContent = `${levelRuntime.name}: Collect ${state.totalBones} bones and reach the flag!${bossHint}`;
@@ -1851,6 +2041,24 @@ function update() {
   updateToyProjectile(level);
   updateLightSwitches(level);
 
+  if (level.tunnel && level.tunnelEntrance && !state.tunnelBurstDone) {
+    const entry = level.tunnelEntrance;
+    const dogCenterX = dog.x + dog.w / 2;
+    if (dogCenterX >= entry.x && dogCenterX <= entry.x + entry.w && dog.y + dog.h >= (entry.burstY ?? entry.y)) {
+      spawnTunnelDirtBurst(entry);
+      state.tunnelBurstDone = true;
+      statusEl.textContent = `${level.name}: Dig, Henry, dig!`;
+    }
+  }
+
+  state.dirtBursts = state.dirtBursts.filter((particle) => {
+    particle.x += particle.vx;
+    particle.y += particle.vy;
+    particle.vy += 0.22;
+    particle.vx *= 0.98;
+    return Date.now() - particle.bornAt < particle.life && particle.y < canvas.height + 40;
+  });
+
   if (Date.now() >= state.hitControlLockUntil) {
     if (level.water) {
       dog.vx *= WATER_DRAG;
@@ -1989,7 +2197,9 @@ function update() {
   dog.y += dog.vy;
   dog.onGround = false;
 
+  state.supportingPlatform = null;
   for (const p of level.platforms) {
+    if (!isPlatformSolid(p)) continue;
     const wasAbove = dog.y + dog.h - dog.vy <= p.y;
     if (intersects(dog, p) && dog.vy >= 0 && wasAbove) {
       dog.y = p.y - dog.h;
@@ -1997,7 +2207,16 @@ function update() {
       dog.onGround = true;
       state.lastGroundedAt = now;
       state.superJumpUsed = false;
+      state.supportingPlatform = p;
     }
+  }
+
+  const collapsedCloud = updateCloudPlatforms(level, now, state.supportingPlatform || null);
+  if (collapsedCloud) {
+    dog.onGround = false;
+    state.lastGroundedAt = 0;
+    dog.vy = Math.max(dog.vy, 1.8);
+    state.supportingPlatform = null;
   }
 
   resolvePlayerPenetration(level);
@@ -2238,6 +2457,85 @@ function drawParallax() {
     return;
   }
 
+  if (level.cloud) {
+    const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    g.addColorStop(0, "#8fd7ff");
+    g.addColorStop(0.52, "#cceeff");
+    g.addColorStop(1, "#f4fbff");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = "rgba(255, 235, 165, 0.95)";
+    ctx.beginPath();
+    ctx.arc(canvas.width - 130, 92, 46, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(255, 249, 224, 0.32)";
+    ctx.beginPath();
+    ctx.arc(canvas.width - 146, 76, 34, 0, Math.PI * 2);
+    ctx.fill();
+
+    for (let band = 0; band < 3; band++) {
+      const parallax = 0.12 + band * 0.14;
+      const baseY = 84 + band * 96;
+      const alpha = 0.46 - band * 0.09;
+      ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+      for (let i = 0; i < 7; i++) {
+        const cx = ((i * 230 - cam * parallax) % (canvas.width + 320)) - 120;
+        const cy = baseY + (i % 2) * 22;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, 64, 26, 0, 0, Math.PI * 2);
+        ctx.ellipse(cx + 46, cy - 10, 44, 22, 0, 0, Math.PI * 2);
+        ctx.ellipse(cx - 42, cy - 6, 40, 20, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    ctx.fillStyle = "rgba(186, 220, 245, 0.5)";
+    for (let i = 0; i < 10; i++) {
+      const x = i * 220 - cam * 0.28;
+      ctx.beginPath();
+      ctx.ellipse(x + 110, 520, 140, 52, 0, Math.PI, Math.PI * 2);
+      ctx.fill();
+    }
+    return;
+  }
+
+  if (level.tunnel) {
+    const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    g.addColorStop(0, "#5b3b1c");
+    g.addColorStop(0.34, "#7a5228");
+    g.addColorStop(0.341, "#3a2614");
+    g.addColorStop(1, "#1a120c");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = "rgba(255, 214, 149, 0.08)";
+    for (let i = 0; i < 12; i++) {
+      const x = ((i * 160 - cam * 0.18) % (canvas.width + 180)) - 60;
+      ctx.beginPath();
+      ctx.arc(x, 125 + (i % 3) * 42, 20 + (i % 2) * 7, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.fillStyle = "rgba(59, 37, 20, 0.7)";
+    for (let i = 0; i < 16; i++) {
+      const x = i * 220 - cam * 0.28;
+      ctx.beginPath();
+      ctx.arc(x + 90, 520, 145, Math.PI, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.fillStyle = "rgba(210, 170, 100, 0.14)";
+    for (let i = 0; i < 15; i++) {
+      const x = ((i * 200 - cam * 0.42 + Date.now() * 0.012) % (canvas.width + 220)) - 80;
+      const y = 210 + (i % 4) * 58;
+      ctx.beginPath();
+      ctx.ellipse(x, y, 46, 14, ((i % 3) - 1) * 0.18, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    return;
+  }
+
   if (level.volcano) {
     const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
     g.addColorStop(0, "#1f0603");
@@ -2363,9 +2661,60 @@ function roundedRect(x, y, w, h, r) {
 function drawPlatform(p) {
   const radius = Math.min(12, Math.min(p.w, p.h) / 2);
   const level = levelRuntime;
+  const now = Date.now();
   let top = "#7f5640";
   let bottom = "#4e3529";
   let highlight = "rgba(255,255,255,0.12)";
+
+  if (level.tunnel) {
+    top = "#8e6336";
+    bottom = "#4f331b";
+    highlight = "rgba(255, 228, 173, 0.12)";
+  }
+
+  if (level.cloud) {
+    const unstable = Boolean(p.cloudVanish);
+    const active = isPlatformSolid(p);
+    const collapseProgress = unstable && p.occupiedSince ? Math.min(1, (now - p.occupiedSince) / CLOUD_PLATFORM_HOLD_MS) : 0;
+    const respawnProgress = unstable && !active && p.respawnAt ? 1 - Math.max(0, p.respawnAt - now) / CLOUD_PLATFORM_RESPAWN_MS : 1;
+    const alpha = active ? 0.98 - collapseProgress * (unstable ? 0.35 : 0) : 0.18 + respawnProgress * 0.26;
+    const puffCount = p.cloudPuffs || Math.max(4, Math.round(p.w / 42));
+    const fill = unstable ? "#efe7ff" : "#ffffff";
+    const shade = unstable ? "rgba(201, 188, 255, 0.78)" : "rgba(199, 227, 255, 0.82)";
+    const rim = unstable ? "rgba(144, 126, 214, 0.34)" : "rgba(158, 204, 255, 0.3)";
+    const puffWidth = p.w / puffCount;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = "rgba(154, 190, 225, 0.22)";
+    ctx.beginPath();
+    ctx.ellipse(p.x + p.w / 2, p.y + p.h - 2, p.w * 0.44, Math.max(8, p.h * 0.35), 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = fill;
+    for (let i = 0; i < puffCount; i++) {
+      const cx = p.x + puffWidth * i + puffWidth * 0.5;
+      const rx = puffWidth * 0.68;
+      const ry = p.h * (0.65 + (i % 2) * 0.08);
+      const cy = p.y + p.h * 0.54 - (i % 2) * 2;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.fillStyle = shade;
+    ctx.beginPath();
+    ctx.ellipse(p.x + p.w / 2, p.y + p.h * 0.78, p.w * 0.42, Math.max(7, p.h * 0.24), 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = rim;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(p.x + p.w / 2, p.y + p.h * 0.54, p.w * 0.46, Math.max(10, p.h * 0.52), 0, Math.PI * 1.02, Math.PI * 1.98);
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
 
   if (level.water) {
     top = "#466a74";
@@ -2589,6 +2938,54 @@ function drawSirenWave(s) {
 
 function drawEnemy(e) {
   const isDying = e.dying;
+
+  if (e.kind === "mole") {
+    ctx.fillStyle = isDying ? "#4b3426" : "#62412b";
+    ctx.beginPath();
+    ctx.ellipse(e.x + e.w * 0.5, e.y + e.h * 0.64, e.w * 0.5, e.h * 0.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#8a6646";
+    ctx.beginPath();
+    ctx.ellipse(e.x + e.w * 0.5, e.y + e.h * 0.52, e.w * 0.34, e.h * 0.28, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#d8b498";
+    ctx.beginPath();
+    ctx.ellipse(e.x + e.w * (e.dir > 0 ? 0.72 : 0.28), e.y + e.h * 0.5, e.w * 0.14, e.h * 0.1, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(e.x + (e.dir > 0 ? e.w * 0.56 : e.w * 0.24), e.y + e.h * 0.3, Math.max(4, e.w * 0.08), Math.max(4, e.h * 0.1));
+    ctx.fillStyle = "#e6c59d";
+    ctx.fillRect(e.x + e.w * 0.18, e.y + e.h * 0.8, e.w * 0.16, e.h * 0.08);
+    ctx.fillRect(e.x + e.w * 0.66, e.y + e.h * 0.8, e.w * 0.16, e.h * 0.08);
+    return;
+  }
+
+  if (e.kind === "mouse") {
+    ctx.fillStyle = isDying ? "#474746" : "#676766";
+    ctx.beginPath();
+    ctx.ellipse(e.x + e.w * 0.5, e.y + e.h * 0.62, e.w * 0.42, e.h * 0.3, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(e.x + e.w * 0.3, e.y + e.h * 0.34, e.w * 0.12, 0, Math.PI * 2);
+    ctx.arc(e.x + e.w * 0.48, e.y + e.h * 0.28, e.w * 0.11, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#c2b5aa";
+    ctx.beginPath();
+    ctx.ellipse(e.x + e.w * (e.dir > 0 ? 0.76 : 0.24), e.y + e.h * 0.54, e.w * 0.12, e.h * 0.09, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#d3a3b0";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    const tailStartX = e.dir > 0 ? e.x + e.w * 0.14 : e.x + e.w * 0.86;
+    const tailDir = e.dir > 0 ? -1 : 1;
+    ctx.moveTo(tailStartX, e.y + e.h * 0.56);
+    ctx.quadraticCurveTo(tailStartX + tailDir * 10, e.y + e.h * 0.34, tailStartX + tailDir * 18, e.y + e.h * 0.62);
+    ctx.stroke();
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(e.x + (e.dir > 0 ? e.w * 0.58 : e.w * 0.28), e.y + e.h * 0.42, Math.max(3, e.w * 0.08), Math.max(3, e.h * 0.1));
+    return;
+  }
+
   ctx.fillStyle = isDying ? "#4c2525" : e.giant ? "#824141" : "#6f2f2f";
   ctx.fillRect(e.x, e.y, e.w, e.h);
   ctx.fillStyle = e.giant ? "#efc496" : "#d6a574";
@@ -3058,6 +3455,86 @@ function drawBonesHUD(total, collected) {
   ctx.restore();
 }
 
+function getActiveMobileZones() {
+  const zones = new Set();
+  for (const touch of mobileControlState.activeTouches.values()) {
+    if (touch.zone) zones.add(touch.zone);
+  }
+  return zones;
+}
+
+function drawMobileTouchGuide() {
+  if (!mobileControlState.immersive || state.mode !== "playing") return;
+
+  const zones = getActiveMobileZones();
+  const zoneY = canvas.height - 78;
+  const zoneH = 60;
+  const leftW = canvas.width * 0.29;
+  const centerW = canvas.width * 0.22;
+  const rightW = canvas.width * 0.29;
+  const gap = canvas.width * 0.04;
+  const totalW = leftW + centerW + rightW + gap * 2;
+  const startX = (canvas.width - totalW) / 2;
+  const zonesToDraw = [
+    { key: "left", x: startX, w: leftW, tint: "110, 231, 183" },
+    { key: "center", x: startX + leftW + gap, w: centerW, tint: "255, 210, 122" },
+    { key: "right", x: startX + leftW + gap + centerW + gap, w: rightW, tint: "110, 231, 183" },
+  ];
+
+  ctx.save();
+  ctx.lineWidth = 2;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  for (const zone of zonesToDraw) {
+    const active = zones.has(zone.key);
+    const fillAlpha = active ? 0.28 : 0.14;
+    const strokeAlpha = active ? 0.62 : 0.28;
+    ctx.fillStyle = `rgba(${zone.tint}, ${fillAlpha})`;
+    ctx.strokeStyle = `rgba(255, 255, 255, ${strokeAlpha})`;
+    ctx.beginPath();
+    ctx.roundRect(zone.x, zoneY, zone.w, zoneH, 22);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.save();
+    ctx.translate(zone.x + zone.w / 2, zoneY + zoneH / 2);
+    ctx.strokeStyle = active ? "rgba(255,255,255,0.96)" : "rgba(255,255,255,0.74)";
+    ctx.fillStyle = active ? "rgba(255,255,255,0.96)" : "rgba(255,255,255,0.74)";
+    ctx.lineWidth = 4;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    if (zone.key === "left") {
+      ctx.beginPath();
+      ctx.moveTo(16, -14);
+      ctx.lineTo(-10, 0);
+      ctx.lineTo(16, 14);
+      ctx.stroke();
+    } else if (zone.key === "right") {
+      ctx.beginPath();
+      ctx.moveTo(-16, -14);
+      ctx.lineTo(10, 0);
+      ctx.lineTo(-16, 14);
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.arc(-7, 0, 7, -0.6, 0.6);
+      ctx.arc(4, 0, 10, -0.55, 0.55);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(-20, -2, 3.5, 0, Math.PI * 2);
+      ctx.arc(-15, -10, 2.5, 0, Math.PI * 2);
+      ctx.arc(-13, 6, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
 function drawLevelProgressHUD(level) {
   if (!level?.worldWidth || state.mode !== "playing") return;
 
@@ -3387,6 +3864,8 @@ function drawOverlay() {
     const tags = [];
     if (levelRuntime.water) tags.push("Swim");
     if (levelRuntime.moon) tags.push("Moon");
+    if (levelRuntime.cloud) tags.push("Clouds");
+    if (levelRuntime.tunnel) tags.push("Tunnel");
     if (levelRuntime.volcano) tags.push("Volcano");
     if (levelRuntime.giantEnemies) tags.push("Big Corgis");
     if (levelRuntime.dark) tags.push("Lights");
@@ -3551,6 +4030,12 @@ function render() {
 
   for (const pool of level.lavaPools || []) drawLavaPool(pool);
   for (const p of level.platforms) drawPlatform(p);
+  for (const burst of state.dirtBursts) {
+    ctx.fillStyle = burst.color;
+    ctx.beginPath();
+    ctx.arc(burst.x, burst.y, burst.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
   for (const s of level.spikes) drawSpike(s);
   for (const b of level.bones) drawBone(b);
   for (const h of level.hearts || []) drawHeartPickup(h);
@@ -3630,6 +4115,8 @@ function render() {
     });
     ctx.restore();
   }
+
+  drawMobileTouchGuide();
 
   if (level.boss) {
     const boss = level.boss;
@@ -3905,7 +4392,7 @@ window.addEventListener("keydown", (e) => {
   if (/^Key[A-Z]$/.test(e.code)) {
     state.cheatBuffer = (state.cheatBuffer + e.code.replace("Key", "").toLowerCase()).slice(-12);
     if (state.cheatBuffer.includes("henry")) {
-      if (bgMusic.audio) bgMusic.audio.pause();
+      stopBgMusic();
       playSecretSound();
       openLevelSelect();
       state.cheatBuffer = "";
@@ -3936,7 +4423,242 @@ window.addEventListener("keydown", (e) => {
 
 window.addEventListener("keyup", (e) => setKey(e.code, false));
 
+function isMobileDevice() {
+  return Boolean(
+    (window.matchMedia && window.matchMedia("(pointer: coarse)").matches && navigator.maxTouchPoints > 0) ||
+      /iPhone|iPad|iPod|Android|Mobile/i.test(navigator.userAgent || "")
+  );
+}
+
+function isLandscapeOrientation() {
+  return window.innerWidth > window.innerHeight;
+}
+
+function clearMobileJumpReleaseTimeout() {
+  if (!mobileControlState.jumpReleaseTimeout) return;
+  window.clearTimeout(mobileControlState.jumpReleaseTimeout);
+  mobileControlState.jumpReleaseTimeout = null;
+}
+
+function clearMobileCenterTapTimeout() {
+  if (!mobileControlState.centerTapTimeout) return;
+  window.clearTimeout(mobileControlState.centerTapTimeout);
+  mobileControlState.centerTapTimeout = null;
+}
+
+function clearMobileDirectionalInput() {
+  mobileControlState.movementSide = null;
+  mobileControlState.movementTouchId = null;
+  if (state.mode === "paused") return;
+  state.keys.left = false;
+  state.keys.right = false;
+}
+
+function resetMobileTrackedTouches() {
+  mobileControlState.activeTouches.clear();
+  mobileControlState.movementTouchId = null;
+  mobileControlState.movementSide = null;
+}
+
+function getMobileBottomZone(x, y) {
+  if (y < window.innerHeight / 2) return null;
+  const leftEdge = window.innerWidth * 0.35;
+  const rightEdge = window.innerWidth * 0.65;
+  if (x < leftEdge) return "left";
+  if (x > rightEdge) return "right";
+  return "center";
+}
+
+function applyMobileDirectionalInput(side) {
+  if (!mobileControlState.enabled || !mobileControlState.immersive || state.mode === "paused") {
+    clearMobileDirectionalInput();
+    return;
+  }
+
+  mobileControlState.movementSide = side;
+  state.keys.left = side === "left";
+  state.keys.right = side === "right";
+  if (side === "left") state.dog.facing = -1;
+  if (side === "right") state.dog.facing = 1;
+}
+
+function getTrackedMobileTouch(touchId) {
+  return mobileControlState.activeTouches.get(touchId) || null;
+}
+
+function trackMobileTouch(touch) {
+  const tracked = {
+    id: touch.identifier,
+    startX: touch.clientX,
+    startY: touch.clientY,
+    startAt: Date.now(),
+    zone: getMobileBottomZone(touch.clientX, touch.clientY),
+    jumpSwipeTriggered: false,
+  };
+  mobileControlState.activeTouches.set(touch.identifier, tracked);
+  return tracked;
+}
+
+function updateTrackedMobileTouch(tracked, touch) {
+  if (!tracked) return null;
+  tracked.zone = getMobileBottomZone(touch.clientX, touch.clientY) || tracked.zone;
+  tracked.lastX = touch.clientX;
+  tracked.lastY = touch.clientY;
+  return tracked;
+}
+
+function syncMobileMovementTouch() {
+  const currentMovementTouch = getTrackedMobileTouch(mobileControlState.movementTouchId);
+  if (currentMovementTouch && (currentMovementTouch.zone === "left" || currentMovementTouch.zone === "right")) {
+    applyMobileDirectionalInput(currentMovementTouch.zone);
+    return;
+  }
+
+  const nextMovementTouch = [...mobileControlState.activeTouches.values()]
+    .filter((touch) => touch.zone === "left" || touch.zone === "right")
+    .sort((a, b) => a.startAt - b.startAt)[0];
+
+  if (!nextMovementTouch) {
+    clearMobileDirectionalInput();
+    return;
+  }
+
+  mobileControlState.movementTouchId = nextMovementTouch.id;
+  applyMobileDirectionalInput(nextMovementTouch.zone);
+}
+
+function triggerMobileSwipeJump(tracked) {
+  if (tracked) tracked.jumpSwipeTriggered = true;
+  clearMobileJumpReleaseTimeout();
+  handleJumpPress();
+  mobileControlState.jumpReleaseTimeout = window.setTimeout(() => {
+    handleJumpRelease();
+    mobileControlState.jumpReleaseTimeout = null;
+  }, 90);
+}
+
+function triggerMobileTapJump() {
+  clearMobileJumpReleaseTimeout();
+  handleJumpPress();
+  mobileControlState.jumpReleaseTimeout = window.setTimeout(() => {
+    handleJumpRelease();
+    mobileControlState.jumpReleaseTimeout = null;
+  }, 90);
+}
+
+async function requestGameFullscreen() {
+  if (!mobileControlState.enabled) return false;
+  const targetEl = canvas;
+  try {
+    if (document.fullscreenElement !== targetEl && targetEl.requestFullscreen) {
+      await targetEl.requestFullscreen();
+      return true;
+    }
+  } catch (_) {}
+  return document.fullscreenElement === targetEl;
+}
+
+function syncMobileExperience() {
+  mobileControlState.enabled = isMobileDevice();
+  mobileControlState.landscape = isLandscapeOrientation();
+  mobileControlState.immersive = mobileControlState.enabled && mobileControlState.landscape;
+
+  document.body.classList.toggle("mobile-device", mobileControlState.enabled);
+  document.body.classList.toggle("mobile-portrait", mobileControlState.enabled && !mobileControlState.landscape);
+  document.body.classList.toggle("mobile-motion-prompt", mobileControlState.enabled && !mobileControlState.landscape);
+  document.body.classList.toggle("mobile-immersive", mobileControlState.immersive);
+
+  if (!mobileControlState.immersive) {
+    resetMobileTrackedTouches();
+    clearMobileDirectionalInput();
+    clearMobileJumpReleaseTimeout();
+    clearMobileCenterTapTimeout();
+    mobileControlState.lastCenterTapAt = 0;
+    handleJumpRelease();
+  }
+
+  if (mobileOverlayEl) {
+    mobileOverlayEl.classList.toggle("hidden", !mobileControlState.enabled || mobileControlState.landscape);
+  }
+  if (mobileOverlayTitleEl) {
+    mobileOverlayTitleEl.textContent = "Rotate to landscape";
+  }
+  if (mobileOverlayMessageEl) {
+    mobileOverlayMessageEl.textContent = mobileControlState.landscape
+      ? ""
+      : "Turn your phone sideways. Bottom left/right move Henry, tap or swipe up there to jump, and use the bottom center to bark or double tap for super bark.";
+  }
+  if (mobileMotionBtn) {
+    mobileMotionBtn.classList.add("hidden");
+  }
+
+  if (mobileControlState.enabled && mobileControlState.immersive && mobileControlsPanelEl) {
+    setTouchControlsVisible(false, false);
+  }
+}
+
+function handleJumpPress() {
+  startBgMusic();
+  if (state.mode === "start") {
+    startGame();
+  } else if (state.mode === "title") {
+    beginLevelPlay();
+  } else if (state.mode === "won" || state.mode === "lost" || state.mode === "gameover") {
+    resetGame();
+  } else if (state.mode === "dead") {
+    continueRun();
+  } else if (state.mode === "paused") {
+    confirmPauseSelection();
+  } else {
+    state.keys.jump = true;
+    state.jumpHeld = true;
+    noteJumpTap();
+  }
+}
+
+function handleJumpRelease() {
+  state.keys.jump = false;
+  state.jumpHeld = false;
+}
+
+function handleSingleBarkAction() {
+  startBgMusic();
+  if (state.mode === "dead") {
+    quitToStart();
+    return;
+  }
+  if (state.mode === "paused") {
+    cyclePauseSelection(1);
+    return;
+  }
+  if (state.mode === "playing") triggerBark();
+}
+
+function handleSuperBarkAction() {
+  startBgMusic();
+  if (state.mode === "dead") {
+    quitToStart();
+    return;
+  }
+  if (state.mode === "paused") {
+    cyclePauseSelection(1);
+    return;
+  }
+  triggerSuperBark();
+}
+
+async function primeMobileExperience() {
+  unlockAudio();
+  if (!mobileControlState.enabled) return;
+  syncMobileExperience();
+  if (!mobileControlState.landscape) return;
+  await requestGameFullscreen();
+  syncMobileExperience();
+}
+
 canvas.addEventListener("pointerdown", (e) => {
+  unlockAudio();
+  if (mobileControlState.enabled && e.pointerType !== "mouse") primeMobileExperience();
   startBgMusic();
   if (state.mode === "start") {
     e.preventDefault();
@@ -3996,50 +4718,17 @@ bindHoldButton(
 const jumpBtn = document.getElementById("btn-jump");
 jumpBtn.addEventListener("pointerdown", (e) => {
   e.preventDefault();
-  startBgMusic();
-  if (state.mode === "start") {
-    startGame();
-  } else if (state.mode === "title") {
-    beginLevelPlay();
-  } else if (state.mode === "won" || state.mode === "lost" || state.mode === "gameover") {
-    resetGame();
-  } else if (state.mode === "dead") {
-    continueRun();
-  } else if (state.mode === "paused") {
-    confirmPauseSelection();
-  } else {
-    state.keys.jump = true;
-    state.jumpHeld = true;
-    noteJumpTap();
-  }
+  handleJumpPress();
 });
-jumpBtn.addEventListener("pointerup", () => {
-  state.keys.jump = false;
-  state.jumpHeld = false;
-});
-jumpBtn.addEventListener("pointerleave", () => {
-  state.keys.jump = false;
-  state.jumpHeld = false;
-});
-jumpBtn.addEventListener("pointercancel", () => {
-  state.keys.jump = false;
-  state.jumpHeld = false;
-});
+jumpBtn.addEventListener("pointerup", handleJumpRelease);
+jumpBtn.addEventListener("pointerleave", handleJumpRelease);
+jumpBtn.addEventListener("pointercancel", handleJumpRelease);
 
 const barkBtn = document.getElementById("btn-bark");
 if (barkBtn) {
   barkBtn.addEventListener("pointerdown", (e) => {
     e.preventDefault();
-    startBgMusic();
-    if (state.mode === "dead") {
-      quitToStart();
-      return;
-    }
-    if (state.mode === "paused") {
-      cyclePauseSelection(1);
-      return;
-    }
-    triggerSuperBark();
+    handleSuperBarkAction();
   });
 }
 
@@ -4173,6 +4862,7 @@ if (fullscreenBtn) {
         : "Stretch the playfield for distraction-free play, then press <kbd>Esc</kbd> to exit.";
     }
     document.body.classList.toggle("fullscreen-mode", active);
+    syncMobileExperience();
   };
   updateLabel();
   fullscreenBtn.addEventListener("click", async () => {
@@ -4196,6 +4886,130 @@ if (touchControlsBtn) {
   });
 }
 
+if (mobileMotionBtn) {
+  mobileMotionBtn.addEventListener("click", async () => {
+    unlockAudio();
+    await primeMobileExperience();
+  });
+}
+
+canvas.addEventListener(
+  "touchstart",
+  async (e) => {
+    unlockAudio();
+    if (!mobileControlState.enabled) return;
+    if (!mobileControlState.immersive) {
+      await primeMobileExperience();
+    }
+    if (!mobileControlState.immersive) return;
+    if (!e.changedTouches.length) return;
+    e.preventDefault();
+
+    for (const touch of e.changedTouches) {
+      const tracked = trackMobileTouch(touch);
+      if ((tracked.zone === "left" || tracked.zone === "right") && mobileControlState.movementTouchId == null) {
+        mobileControlState.movementTouchId = tracked.id;
+      }
+    }
+
+    syncMobileMovementTouch();
+  },
+  { passive: false }
+);
+
+canvas.addEventListener(
+  "touchmove",
+  (e) => {
+    if (!mobileControlState.enabled || !mobileControlState.immersive) return;
+    if (!e.changedTouches.length) return;
+    e.preventDefault();
+
+    for (const touch of e.changedTouches) {
+      const tracked = updateTrackedMobileTouch(getTrackedMobileTouch(touch.identifier), touch);
+      if (!tracked || (tracked.zone !== "left" && tracked.zone !== "right" && tracked.zone !== "center")) continue;
+
+      const deltaY = touch.clientY - tracked.startY;
+      if ((tracked.zone === "left" || tracked.zone === "right") && !tracked.jumpSwipeTriggered && deltaY <= -MOBILE_SWIPE_JUMP_MIN) {
+        triggerMobileSwipeJump(tracked);
+      }
+    }
+
+    syncMobileMovementTouch();
+  },
+  { passive: false }
+);
+
+canvas.addEventListener(
+  "touchend",
+  (e) => {
+    if (!mobileControlState.enabled || !mobileControlState.immersive) return;
+    if (!e.changedTouches.length) return;
+    e.preventDefault();
+
+    for (const touch of e.changedTouches) {
+      const tracked = getTrackedMobileTouch(touch.identifier);
+      if (!tracked) continue;
+
+      const touchDuration = Date.now() - tracked.startAt;
+      const deltaX = touch.clientX - tracked.startX;
+      const deltaY = touch.clientY - tracked.startY;
+      const isTap = Math.abs(deltaX) < 20 && Math.abs(deltaY) < 20 && touchDuration <= MOBILE_TAP_JUMP_MAX_MS;
+
+      if (tracked.zone === "left" || tracked.zone === "right") {
+        if (isTap && !tracked.jumpSwipeTriggered) {
+          triggerMobileTapJump();
+        }
+      } else if (tracked.zone === "center" && isTap) {
+        const now = Date.now();
+        if (now - mobileControlState.lastCenterTapAt <= MOBILE_DOUBLE_TAP_MS) {
+          clearMobileCenterTapTimeout();
+          mobileControlState.lastCenterTapAt = 0;
+          handleSuperBarkAction();
+        } else {
+          mobileControlState.lastCenterTapAt = now;
+          clearMobileCenterTapTimeout();
+          mobileControlState.centerTapTimeout = window.setTimeout(() => {
+            handleSingleBarkAction();
+            mobileControlState.centerTapTimeout = null;
+            mobileControlState.lastCenterTapAt = 0;
+          }, MOBILE_DOUBLE_TAP_MS);
+        }
+      }
+
+      mobileControlState.activeTouches.delete(touch.identifier);
+      if (mobileControlState.movementTouchId === touch.identifier) {
+        mobileControlState.movementTouchId = null;
+      }
+    }
+
+    syncMobileMovementTouch();
+  },
+  { passive: false }
+);
+
+canvas.addEventListener(
+  "touchcancel",
+  (e) => {
+    if (!mobileControlState.enabled) return;
+    clearMobileJumpReleaseTimeout();
+    handleJumpRelease();
+    if (e.changedTouches.length) {
+      for (const touch of e.changedTouches) {
+        mobileControlState.activeTouches.delete(touch.identifier);
+        if (mobileControlState.movementTouchId === touch.identifier) {
+          mobileControlState.movementTouchId = null;
+        }
+      }
+    }
+    syncMobileMovementTouch();
+    e.preventDefault();
+  },
+  { passive: false }
+);
+
+window.addEventListener("resize", syncMobileExperience);
+window.addEventListener("orientationchange", syncMobileExperience);
+
 if (audioBtn) {
   audioBtn.addEventListener("pointerdown", (e) => {
     e.preventDefault();
@@ -4203,5 +5017,6 @@ if (audioBtn) {
   });
 }
 
+syncMobileExperience();
 initTouchControlsVisibility();
 startAfterFonts();

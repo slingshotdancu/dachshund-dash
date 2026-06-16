@@ -1,5 +1,74 @@
 # Dachshund Dash Changelog
 
+## 2026-06-15
+### Follow-up audio tweak: giant corgis stage now uses its own track
+- Changed the giant corgis level music so that stage now plays **`assets/giantlevel.wav`** instead of falling back to the standard run track.
+- Kept the change local to level music routing, so gameplay and other stage themes stay untouched.
+- Verified the giant-enemy stage still resolves correctly and now points at the dedicated giant-level music asset.
+
+### Requested improvement: Level 9 is now a tunnel-digging stage underground
+- Rebuilt the level after Clouds into an underground **Tunnel** stage with a surface dig shaft, packed dirt walls, and a burrow-like path that snakes through the ground instead of another open-sky run.
+- Added tunnel-specific enemies — **moles** and **mice** — so the underground route feels like a real burrow full of critters instead of reused overworld bad guys.
+- When Henry first drops into the dig shaft, a one-shot **dirt burst** now sprays out around the entrance to sell the dachshund digging fantasy you asked for.
+
+![Level 9 rebuilt as a tunnel stage with an underground route, mole and mouse enemies, and dirt flying from the dig entrance](changelog/2026-06-15-level-9-tunnel.png)
+
+### Follow-up audio tweak: water stage now uses its own swim track
+- Changed the water/swim level music so the stage now plays **`assets/waterlevel.wav`** instead of falling back to the standard run track.
+- Kept the change local to level music selection, so gameplay, controls, and other stages stay untouched.
+- Verified the water stage still resolves as the themed swim level and now points at the dedicated water music asset.
+
+### Daily improvement: volcano stage now uses its own lava music
+- Changed the volcano/lava level music so the stage now plays **`assets/lavalevel.wav`** instead of falling back to the standard run track.
+- Kept the change local to level music selection, so gameplay, controls, and other stages stay untouched.
+- Verified the volcano stage still resolves as the themed lava level and now points at the dedicated lava music asset.
+
+### Daily improvement: immersive mobile mode now shows touch pads on screen
+- Added subtle **left / bark / right touch pads** at the bottom of immersive mobile gameplay so the new control layout is visible without relying on extra instruction text.
+- The pads lightly glow when pressed, which makes it easier to tell which zone is active during movement or barking.
+- Kept the overlay compact and icon-based so it helps readability without adding more reading-heavy UI.
+
+![Immersive mobile gameplay showing the new on-screen touch pads for left, bark, and right controls](changelog/2026-06-15-mobile-touch-pads.png)
+
+### Requested mobile control rewrite: bottom zones now split into left / bark / right
+- Replaced the immersive phone tilt scheme with a simpler direct-touch layout: **hold the bottom-left of the screen to run left**, **hold the bottom-right to run right**, and **release to stand still**.
+- The left and right movement zones now support **both a quick tap jump** and an **upward swipe jump**, which fixes swimming and other cases where repeated jump input matters.
+- Reserved the **bottom-center** area for bark controls: **single tap = bark**, **double tap = super bark**, so movement/jump gestures no longer fight with barking.
+- Reworked the touch handler for **true two-finger play**, so you can keep holding one side to run and tap/swipe jump on the opposite side without Henry flipping directions.
+
+### Follow-up tuning: mobile tilt is calmer and level music now swaps cleanly
+- Fixed the background-music handoff so repeated mobile audio unlock/start attempts do not leave the **Level 1** track hanging around after you move into the next level.
+- Raised the mobile tilt threshold and widened the neutral zone, so Henry now stays still through small hand movement and needs a more deliberate lean before he starts running.
+- Locked landscape tilt to a stable dominant axis and smoothed the sensor input, which removes the odd **brief left-run glitch** that could happen while switching directions.
+
+## 2026-06-14
+### Follow-up tooling: local HTTPS launcher added for iPhone Safari tilt support
+- Added `scripts/run-https.sh` plus `scripts/serve-https.js` so the game can be served over **local HTTPS** instead of plain HTTP, which is important for iPhone motion/tilt APIs.
+- The launcher now auto-generates a local certificate for `localhost`, the Mac’s current LAN IP, and the Mac’s `.local` hostname, then prints the exact iPhone URL to open.
+- Added `.cert/` to `.gitignore` and documented the HTTPS flow in `README.md` so the setup is repeatable without committing private keys.
+
+## 2026-06-14
+### Follow-up fix: tilt controls now calibrate to neutral and support iPhone landscape better
+- Reworked the mobile tilt handler so it **calibrates a neutral resting angle**, which means Henry should now stay still when the phone is not tilted.
+- Added a **landscape-aware axis fallback** so iPhone tilt can drive movement even when Safari reports the sideways lean on a different orientation axis than expected.
+- If Safari still refuses to send motion data, the game now says so explicitly and explains the likely cause: **plain local HTTP instead of HTTPS** on iPhone sensor APIs.
+
+## 2026-06-14
+### Requested improvement: mobile play now uses immersive tilt-and-touch controls
+- Mobile browsers are now detected automatically, and phones in portrait get a full-screen **rotate to landscape** prompt before play.
+- In landscape mobile mode, the game hides the shell UI so only the gameplay view remains visible, then switches controls to **tilt left/right to run**, **touch or swipe up to jump**, **bottom-half tap to bark**, and **bottom-half double tap for super bark**.
+- Added an iPhone-friendly motion-permission/fullscreen handoff so Safari users can enable tilt controls from an in-game prompt instead of relying on the old button row underneath the canvas.
+
+![iPhone landscape view showing the new immersive mobile mode with shell UI hidden and the game filling the screen](changelog/2026-06-14-mobile-immersive-landscape.png)
+
+## 2026-06-14
+### Requested improvement: Level 8 is now a cloud stage with fading platforms
+- Rebuilt **Level 8** into a sky run with a bright cloud backdrop, cloud-shaped platforms, and a lighter final approach so the whole stage reads like a trip through the sky instead of a standard ground layout.
+- Added **six tinted cloud platforms** that disappear if Henry stands on them for more than a couple seconds, then reform shortly after, creating the temporary footing you asked for without turning the level into a dead-end trap.
+- Updated the level theme labels so Level 8 now shows up as **Clouds** in the run summary, intro chips, and hidden HENRY level select.
+
+![Level 8 rebuilt as a cloud stage with floating cloud platforms and timed disappearing pastel clouds](changelog/2026-06-14-level-8-clouds.png)
+
 ## 2026-06-14
 ### Daily improvement: touch-control panel now explains the multi-use buttons
 - Added a compact heading to the **On-screen controls** panel so the touch row reads like an intentional control surface instead of a floating button strip.
