@@ -64,6 +64,10 @@ const CLOUD_PLATFORM_RESPAWN_MS = 3200;
 const DARK_SWITCH_REVEAL_MS = 5000;
 const LAVA_TOP_Y = 510;
 const LAVA_HEIGHT = 30;
+const TUNNEL_DIG_SLOW_MS = 950;
+const TUNNEL_DIG_FAST_MS = 320;
+const TUNNEL_DIG_PARTICLE_MS = 90;
+const TUNNEL_DIG_BOOST_MS = 260;
 
 const AUDIO = {
   musicVol: 60, // 0-100
@@ -143,7 +147,7 @@ function isEnemyAlive(enemy) {
 }
 
 function isPlatformSolid(platform) {
-  return platform.active !== false;
+  return platform.active !== false && !platform.dugOut;
 }
 
 function buildLavaPools(platforms, worldWidth) {
@@ -453,11 +457,14 @@ if (LEVELS[8]) {
     { x: 470, y: 0, w: 2360, h: 180 },
     { x: 470, y: 430, w: 2960, h: 110 },
     { x: 560, y: 250, w: 270, h: 22 },
+    { x: 840, y: 180, w: 60, h: 250, diggable: true },
     { x: 900, y: 330, w: 250, h: 22 },
     { x: 1210, y: 250, w: 310, h: 22 },
     { x: 1560, y: 330, w: 260, h: 22 },
+    { x: 1820, y: 180, w: 60, h: 250, diggable: true },
     { x: 1880, y: 250, w: 290, h: 22 },
     { x: 2230, y: 330, w: 260, h: 22 },
+    { x: 2490, y: 180, w: 60, h: 250, diggable: true },
     { x: 2550, y: 250, w: 300, h: 22 },
     { x: 2910, y: 330, w: 240, h: 22 },
     { x: 3170, y: 250, w: 150, h: 22 },
@@ -563,6 +570,9 @@ const state = {
   toyProjectile: null,
   dirtBursts: [],
   tunnelBurstDone: false,
+  tunnelDigTarget: null,
+  tunnelDigLastAt: 0,
+  tunnelDigBoostUntil: 0,
   dog: {
     x: START_X,
     y: START_Y,
@@ -607,6 +617,115 @@ function spawnTunnelDirtBurst(entrance) {
     });
   }
   state.digUntil = Date.now() + 850;
+}
+
+function spawnDigDirtBurst(platform, contact = "side", options = {}) {
+  const { finish = false, boosted = false } = options;
+  const count = finish ? 26 : boosted ? 12 : 7;
+  const originX =
+    contact === "top"
+      ? platform.x + platform.w * (0.3 + Math.random() * 0.4)
+      : contact === "left"
+        ? platform.x + 6
+        : contact === "right"
+          ? platform.x + platform.w - 6
+          : platform.x + platform.w / 2;
+  const originY =
+    contact === "top"
+      ? platform.y + 4
+      : platform.y + platform.h * (0.28 + Math.random() * 0.44);
+
+  for (let i = 0; i < count; i++) {
+    const horizontal = contact === "left" ? -1 : contact === "right" ? 1 : (Math.random() - 0.5) * 1.8;
+    const speed = finish ? 3.4 + Math.random() * 5.4 : 1.4 + Math.random() * (boosted ? 4.2 : 2.3);
+    state.dirtBursts.push({
+      x: originX + (Math.random() - 0.5) * Math.max(16, platform.w * 0.14),
+      y: originY + (Math.random() - 0.5) * Math.max(12, platform.h * 0.12),
+      vx: horizontal * speed + (contact === "top" ? (Math.random() - 0.5) * 2.3 : 0),
+      vy: finish ? -2.6 - Math.random() * 2.2 : -0.9 - Math.random() * 1.6,
+      r: finish ? 4 + Math.random() * 5.5 : 2.8 + Math.random() * 3.2,
+      bornAt: Date.now(),
+      life: finish ? 780 + Math.random() * 280 : 420 + Math.random() * 220,
+      color: i % 3 === 0 ? "#7f5632" : i % 2 === 0 ? "#9e7245" : "#5f3e24",
+    });
+  }
+}
+
+function getTunnelDigTarget(level = levelRuntime) {
+  if (!level?.tunnel) return null;
+  const dog = state.dog;
+  for (const p of level.platforms) {
+    if (!p.diggable || p.dugOut) continue;
+
+    const fromTop =
+      dog.onGround &&
+      dog.x + dog.w > p.x + 8 &&
+      dog.x < p.x + p.w - 8 &&
+      Math.abs(dog.y + dog.h - p.y) <= 8;
+
+    const verticalOverlap = dog.y + dog.h > p.y + 8 && dog.y < p.y + p.h - 8;
+    const touchingLeft = dog.facing > 0 && dog.x + dog.w >= p.x - 10 && dog.x + dog.w <= p.x + 16 && verticalOverlap;
+    const touchingRight = dog.facing < 0 && dog.x <= p.x + p.w + 10 && dog.x >= p.x + p.w - 16 && verticalOverlap;
+
+    if (fromTop) return { platform: p, contact: "top" };
+    if (touchingLeft) return { platform: p, contact: "left" };
+    if (touchingRight) return { platform: p, contact: "right" };
+  }
+  return null;
+}
+
+function triggerTunnelDigBoost() {
+  if (state.mode !== "playing" || !state.keys.down || !levelRuntime?.tunnel) return false;
+  const digTarget = getTunnelDigTarget(levelRuntime);
+  if (!digTarget) return false;
+  state.tunnelDigBoostUntil = Date.now() + TUNNEL_DIG_BOOST_MS;
+  state.digUntil = Date.now() + 240;
+  state.barkWagUntil = Date.now() + 220;
+  playBarkSound(false);
+  spawnDigDirtBurst(digTarget.platform, digTarget.contact, { boosted: true });
+  return true;
+}
+
+function updateTunnelDigging(level, now) {
+  if (!level?.tunnel) return;
+
+  if (!state.keys.down) {
+    state.tunnelDigTarget = null;
+    state.tunnelDigLastAt = 0;
+    return;
+  }
+
+  const digTarget = getTunnelDigTarget(level);
+  if (!digTarget) {
+    state.tunnelDigTarget = null;
+    state.tunnelDigLastAt = 0;
+    return;
+  }
+
+  const { platform, contact } = digTarget;
+  const boosted = now < state.tunnelDigBoostUntil;
+  const elapsed = state.tunnelDigTarget === platform ? Math.max(0, now - (state.tunnelDigLastAt || now)) : 0;
+  platform.digProgress = Math.min(1, (platform.digProgress || 0) + elapsed / (boosted ? TUNNEL_DIG_FAST_MS : TUNNEL_DIG_SLOW_MS));
+  state.tunnelDigTarget = platform;
+  state.tunnelDigLastAt = now;
+  state.digUntil = Math.max(state.digUntil, now + 120);
+
+  if (!platform.lastDigParticleAt || now - platform.lastDigParticleAt >= (boosted ? TUNNEL_DIG_PARTICLE_MS * 0.45 : TUNNEL_DIG_PARTICLE_MS)) {
+    spawnDigDirtBurst(platform, contact, { boosted });
+    platform.lastDigParticleAt = now;
+  }
+
+  if (platform.digProgress >= 1 && !platform.dugOut) {
+    platform.dugOut = true;
+    platform.active = false;
+    platform.digProgress = 1;
+    spawnDigDirtBurst(platform, contact, { finish: true, boosted });
+    state.digUntil = now + 520;
+    state.tunnelDigBoostUntil = 0;
+    state.tunnelDigTarget = null;
+    state.tunnelDigLastAt = 0;
+    statusEl.textContent = `${level.name}: Tunnel opened!`;
+  }
 }
 
 function renderLives() {
@@ -1370,6 +1489,7 @@ function triggerBark() {
 }
 
 function triggerSuperBark() {
+  if (triggerTunnelDigBoost()) return;
   if (state.mode !== "playing" || !barkReady()) return;
 
   // If holding a toy, throw it instead of the normal super bark clear.
@@ -1450,7 +1570,7 @@ function hydrateLevelRuntime(level) {
     })),
     spikes: level.spikes.map((s) => ({ ...s })),
     lavaPools: (level.lavaPools || []).map((pool) => ({ ...pool })),
-    platforms: level.platforms.map((p) => ({ ...p, active: p.active ?? true, occupiedSince: 0, respawnAt: 0 })),
+    platforms: level.platforms.map((p) => ({ ...p, active: p.active ?? true, occupiedSince: 0, respawnAt: 0, dugOut: false, digProgress: 0, lastDigParticleAt: 0 })),
     finishFlag: { ...level.finishFlag },
     boss,
     sirens: (level.sirens || []).map((s) => ({ ...s })),
@@ -1490,6 +1610,9 @@ function resetPlayerPosition() {
   state.jumpBufferedUntil = 0;
   state.dirtBursts = [];
   state.tunnelBurstDone = false;
+  state.tunnelDigTarget = null;
+  state.tunnelDigLastAt = 0;
+  state.tunnelDigBoostUntil = 0;
 }
 
 function bossStatusText(level) {
@@ -2047,7 +2170,7 @@ function update() {
     if (dogCenterX >= entry.x && dogCenterX <= entry.x + entry.w && dog.y + dog.h >= (entry.burstY ?? entry.y)) {
       spawnTunnelDirtBurst(entry);
       state.tunnelBurstDone = true;
-      statusEl.textContent = `${level.name}: Dig, Henry, dig!`;
+      statusEl.textContent = `${level.name}: ↓ digs • ↓ + BARK drills fast`;
     }
   }
 
@@ -2172,6 +2295,8 @@ function update() {
       statusEl.textContent = `${level.name}: Super Jump!`;
     }
   }
+
+  updateTunnelDigging(level, now);
 
   if (capeActive) {
     if (state.keys.jump) dog.vy -= CAPE_LIFT;
@@ -2712,6 +2837,13 @@ function drawPlatform(p) {
     highlight = "rgba(255, 228, 173, 0.12)";
   }
 
+  if (p.diggable && !p.dugOut) {
+    const progress = Math.max(0, Math.min(1, p.digProgress || 0));
+    top = progress > 0 ? "#b27f46" : "#a7743c";
+    bottom = progress > 0 ? "#644026" : "#5a381f";
+    highlight = progress > 0 ? "rgba(255, 229, 171, 0.28)" : "rgba(255, 218, 150, 0.16)";
+  }
+
   if (level.cloud) {
     const unstable = Boolean(p.cloudVanish);
     const active = isPlatformSolid(p);
@@ -2783,6 +2915,28 @@ function drawPlatform(p) {
   ctx.fillStyle = highlight;
   roundedRect(p.x + 6, p.y + 4, Math.max(0, p.w - 12), Math.max(6, p.h * 0.32), Math.max(3, radius * 0.4));
   ctx.fill();
+
+  if (p.diggable && !p.dugOut) {
+    const progress = Math.max(0, Math.min(1, p.digProgress || 0));
+    ctx.save();
+    ctx.globalAlpha = 0.28 + progress * 0.2;
+    ctx.strokeStyle = "rgba(79, 46, 19, 0.75)";
+    ctx.lineWidth = 3;
+    for (let y = p.y + 18; y < p.y + p.h - 8; y += 28) {
+      ctx.beginPath();
+      ctx.moveTo(p.x + 8, y);
+      ctx.lineTo(p.x + p.w - 10, y + 8);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    if (progress > 0) {
+      ctx.fillStyle = `rgba(255, 231, 175, ${0.2 + progress * 0.2})`;
+      const revealH = Math.max(12, p.h * progress);
+      roundedRect(p.x + 6, p.y + p.h - revealH - 4, p.w - 12, revealH, Math.max(6, radius - 2));
+      ctx.fill();
+    }
+  }
 }
 
 function drawSpike(s) {
@@ -4453,7 +4607,7 @@ window.addEventListener("keydown", (e) => {
   }
 
   if (["KeyF", "KeyK", "ShiftRight"].includes(e.code)) {
-    triggerSuperBark();
+    if (!triggerTunnelDigBoost()) triggerSuperBark();
     e.preventDefault();
   }
 
@@ -4684,6 +4838,7 @@ function handleSuperBarkAction() {
     cyclePauseSelection(1);
     return;
   }
+  if (triggerTunnelDigBoost()) return;
   triggerSuperBark();
 }
 

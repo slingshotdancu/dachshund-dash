@@ -1,6 +1,14 @@
 # Dachshund Dash Changelog
 
 ## 2026-06-16
+### Requested improvement: Level 9 now has real digging through dirt walls
+- Added true **tunnel digging** to Level 9: hold **↓** to dig slowly through soft dirt, or press **↓ + BARK** to chew through it much faster.
+- Placed multiple **diggable dirt walls** through the tunnel stage so the new mechanic is required a few times instead of being just cosmetic.
+- While Henry digs, **dirt now sprays out of the wall/opening**, and each dirt block visually breaks down before opening into a passable tunnel.
+- Verified with `node --check game.js` plus Playwright checks confirming both slow-dig and fast-dig destroy a tunnel wall, and captured a browser screenshot of the dirt burst in action.
+
+![Henry digging through a Level 9 dirt wall with tunnel debris flying out](changelog/2026-06-16-level-9-digging.png)
+
 ### Daily improvement: Level 9 tunnel entrance now has visible drop markers
 - Added glowing **shaft markers** above the Level 9 tunnel entrance so the first drop reads like the intended path instead of a random dirt wall.
 - Framed the opening with warm lanterns, a brighter shaft rim, and animated down-pointing chevrons to teach the route without adding more words to the screen.
