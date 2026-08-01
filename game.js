@@ -15,13 +15,35 @@ const startDesktopBtn = document.getElementById("btn-start-desktop");
 const pauseDesktopBtn = document.getElementById("btn-pause-desktop");
 const fullscreenBtn = document.getElementById("btn-fullscreen");
 const touchControlsBtn = document.getElementById("btn-touch-controls");
+const hideTouchControlsBtn = document.getElementById("btn-hide-touch-controls");
 const audioBtn = document.getElementById("btn-audio");
 const mobileControlsPanelEl = document.getElementById("mobile-controls-panel");
+const recoveryShortcutCalloutEl = document.getElementById("recovery-shortcut-callout");
 const summaryLevelEl = document.getElementById("summary-level");
 const summaryThemeEl = document.getElementById("summary-theme");
 const summaryBonesEl = document.getElementById("summary-bones");
+const summaryContinuesEl = document.getElementById("summary-continues");
 const summaryPowerEl = document.getElementById("summary-power");
 const summaryGoalEl = document.getElementById("summary-goal");
+const summaryTipLabelEl = document.getElementById("summary-tip-label");
+const summaryTipLevelEl = document.getElementById("summary-tip-level");
+const summaryTipLengthEl = document.getElementById("summary-tip-length");
+const summaryTipChallengeEl = document.getElementById("summary-tip-challenge");
+const summaryTipFocusEl = document.getElementById("summary-tip-focus");
+const summaryTipHazardsEl = document.getElementById("summary-tip-hazards");
+const summaryTipPickupsEl = document.getElementById("summary-tip-pickups");
+const summaryTipEl = document.getElementById("summary-tip");
+const startActionContextEl = document.getElementById("start-action-context");
+const henryProgressLevelEl = document.getElementById("henry-progress-level");
+const henryProgressThemeEl = document.getElementById("henry-progress-theme");
+const henryProgressChallengeEl = document.getElementById("henry-progress-challenge");
+const henryProgressLengthEl = document.getElementById("henry-progress-length");
+const henryProgressGoalEl = document.getElementById("henry-progress-goal");
+const henryProgressPickupsEl = document.getElementById("henry-progress-pickups");
+const henryProgressHazardsEl = document.getElementById("henry-progress-hazards");
+const henryProgressFocusEl = document.getElementById("henry-progress-focus");
+const henryProgressTipEl = document.getElementById("henry-progress-tip");
+const henryProgressJumpBtn = document.getElementById("henry-progress-jump");
 
 const bgMusic = { handle: null, started: false, token: 0, src: null, loadingToken: null };
 let capeAudio = null;
@@ -34,8 +56,59 @@ const LEVEL_ONE_MUSIC = ["assets/levelone.wav", "dachshund-dash/assets/levelone.
 const BOSS_MUSIC = "assets/BossLevels.wav";
 const LAVA_LEVEL_MUSIC = "assets/lavalevel.wav";
 const WATER_LEVEL_MUSIC = "assets/waterlevel.wav";
+const MOON_LEVEL_MUSIC = "assets/moonlevel.wav";
 const GIANT_LEVEL_MUSIC = "assets/giantlevel.wav";
 const LOGO_IMG = "assets/henry/middle.jpg";
+
+function levelMusicProfile(level) {
+  if (level?.boss) {
+    return {
+      src: BOSS_MUSIC,
+      label: "Boss mix",
+      description: "boss arena soundtrack",
+    };
+  }
+  if (level?.id === 1) {
+    return {
+      src: LEVEL_ONE_MUSIC,
+      label: "Intro mix",
+      description: "Level 1 intro soundtrack",
+    };
+  }
+  if (level?.water) {
+    return {
+      src: WATER_LEVEL_MUSIC,
+      label: "Swim mix",
+      description: "swim stage soundtrack",
+    };
+  }
+  if (level?.moon) {
+    return {
+      src: MOON_LEVEL_MUSIC,
+      label: "Moon mix",
+      description: "moon stage soundtrack",
+    };
+  }
+  if (level?.volcano) {
+    return {
+      src: LAVA_LEVEL_MUSIC,
+      label: "Volcano mix",
+      description: "volcano stage soundtrack",
+    };
+  }
+  if (level?.giantEnemies) {
+    return {
+      src: GIANT_LEVEL_MUSIC,
+      label: "Big Corgi mix",
+      description: "big corgi chase soundtrack",
+    };
+  }
+  return {
+    src: MAIN_MUSIC,
+    label: "Classic mix",
+    description: "classic run soundtrack",
+  };
+}
 const DOG_SPRITES = {
   left: [
     "assets/henry/left.jpg",
@@ -137,6 +210,7 @@ const TOUCH_CONTROLS_STORAGE_KEY = "dachshund-dash-touch-controls-visible";
 const MOBILE_SWIPE_JUMP_MIN = 34;
 const MOBILE_TAP_JUMP_MAX_MS = 220;
 const MOBILE_DOUBLE_TAP_MS = 280;
+const MOBILE_CENTER_HOLD_DIG_MS = 180;
 
 function intersects(a, b) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
@@ -514,6 +588,8 @@ const mobileControlState = {
   jumpReleaseTimeout: null,
   lastCenterTapAt: 0,
   centerTapTimeout: null,
+  centerHoldTimeout: null,
+  centerHoldTouchId: null,
 };
 
 const state = {
@@ -737,10 +813,40 @@ function renderLives() {
   livesEl.setAttribute("aria-label", `Continues ${continues} of ${LEVEL_RESPAWNS}`);
 }
 
+function runSummaryContinuesMeter() {
+  const continuesLeft = Math.max(0, Math.min(LEVEL_RESPAWNS, state.levelRespawnsLeft || 0));
+  const progress = LEVEL_RESPAWNS > 0 ? (continuesLeft / LEVEL_RESPAWNS) * 100 : 0;
+  const remainingText = `${continuesLeft} of ${LEVEL_RESPAWNS} continues remaining`;
+  if (continuesLeft <= 0) {
+    return {
+      progress,
+      tone: "danger",
+      state: "empty",
+      label: `${remainingText}. No recovery tries remain for this level.`
+    };
+  }
+  if (continuesLeft === LEVEL_RESPAWNS) {
+    return {
+      progress,
+      tone: "ready",
+      state: "full",
+      label: `${remainingText}. All recovery tries are available.`
+    };
+  }
+  return {
+    progress,
+    tone: continuesLeft === 1 ? "danger" : "warning",
+    state: continuesLeft === 1 ? "critical" : "mid",
+    label: `${remainingText}. ${continuesLeft === 1 ? "Final recovery try left." : "Recovery tries are running low."}`
+  };
+}
+
 function runSummaryGoal(level = levelRuntime) {
-  if (state.mode === "start") return { text: "Press Start", tone: "start" };
-  if (state.mode === "title") {
-    return level?.boss ? { text: "Bones · Boss · Flag", tone: "boss" } : { text: "Bones · Flag", tone: "collect" };
+  if (state.mode === "start" || state.mode === "title") {
+    return {
+      text: levelSelectGoalPreview(level).text,
+      tone: level?.boss ? "boss" : level?.tunnel ? "warning" : "collect"
+    };
   }
   if (state.mode === "paused") return { text: "Paused", tone: "paused" };
   if (state.mode === "celebrating") return { text: "Level clear", tone: "clear" };
@@ -756,8 +862,106 @@ function runSummaryGoal(level = levelRuntime) {
   return { text: "Touch flag", tone: "ready" };
 }
 
+function runSummaryGoalMeter(level = levelRuntime) {
+  if (state.mode === "start" || state.mode === "title") {
+    return {
+      progress: 100,
+      state: "preview",
+      label: `Goal preview: ${levelSelectGoalPreview(level).label.replace(/^Goal:\s*/, "")}.`
+    };
+  }
+  if (state.mode === "paused") {
+    return { progress: 100, state: "paused", label: "Goal progress is frozen while paused." };
+  }
+  if (state.mode === "dead" || state.mode === "gameover") {
+    return { progress: 0, state: "reset", label: "Goal progress resets when the run restarts." };
+  }
+  if (state.mode === "celebrating" || state.mode === "won") {
+    return { progress: 100, state: "clear", label: "Goal complete." };
+  }
+
+  const totalBones = Math.max(0, state.totalBones || 0);
+  const bonesCollected = Math.max(0, Math.min(state.bonesCollected || 0, totalBones || state.bonesCollected || 0));
+  const bonesProgress = totalBones > 0 ? (bonesCollected / totalBones) * 100 : 100;
+  if (bonesCollected < totalBones) {
+    return {
+      progress: bonesProgress,
+      state: "bones",
+      label: `Collected ${bonesCollected} of ${totalBones} bones.`
+    };
+  }
+
+  if (level?.boss && !level.boss.dead) {
+    const maxHealth = Math.max(1, level.boss.maxHealth || 1);
+    const health = Math.max(0, Math.min(level.boss.health || 0, maxHealth));
+    return {
+      progress: ((maxHealth - health) / maxHealth) * 100,
+      state: "boss",
+      label: `${level.boss.name} is down to ${health} of ${maxHealth} HP.`
+    };
+  }
+
+  return {
+    progress: 100,
+    state: "ready",
+    label: level?.boss ? "Boss defeated. Touch the flag to finish the stage." : "All bones collected. Touch the flag to finish the stage."
+  };
+}
+
+function launchStatePowerPreview(level = levelRuntime) {
+  if (level?.boss) {
+    return {
+      text: "Bark · Boss",
+      tone: "boss",
+      meterState: "preview-boss",
+      label: `Power preview: super bark is ready, and ${level.boss.name} is waiting at the end of this stage.`
+    };
+  }
+  if (level?.tunnel) {
+    return {
+      text: "Bark · Dig ↓",
+      tone: "warning",
+      meterState: "preview-dig",
+      label: "Power preview: super bark is ready, and this tunnel stage uses hold down to dig."
+    };
+  }
+  if (level?.water) {
+    return {
+      text: "Bark · Swim ↑",
+      tone: "theme",
+      meterState: "preview-swim",
+      label: "Power preview: super bark is ready, and jump taps double as swim strokes in this water stage."
+    };
+  }
+  if (level?.moon) {
+    return {
+      text: "Bark · Float ◔",
+      tone: "theme",
+      meterState: "preview-moon",
+      label: "Power preview: super bark is ready, and this moon stage uses floatier jumps."
+    };
+  }
+  if (Array.isArray(level?.capes) && level.capes.length) {
+    return {
+      text: "Bark · Cape",
+      tone: "boost",
+      meterState: "preview-cape",
+      label: "Power preview: super bark is ready, and a cape pickup appears in this stage."
+    };
+  }
+  return {
+    text: "Bark ready",
+    tone: "ready",
+    meterState: "preview-ready",
+    label: "Power preview: super bark is ready for this stage."
+  };
+}
+
 function runSummaryPower(level = levelRuntime) {
-  if (state.mode === "start") return { text: "Bark · Cape", tone: "boost" };
+  if (state.mode === "start" || state.mode === "title") {
+    const preview = launchStatePowerPreview(level);
+    return { text: preview.text, tone: preview.tone };
+  }
   if (state.mode === "paused") return { text: "Frozen", tone: "paused" };
   if (state.mode === "dead" || state.mode === "gameover") return { text: "Reset", tone: "warning" };
   if (state.mode === "won") return { text: "Champion ✨", tone: "clear" };
@@ -772,7 +976,11 @@ function runSummaryPower(level = levelRuntime) {
     parts.push(barkLeft > 0 ? `Bark ${Math.ceil(barkLeft / 1000)}s` : "Bark ready");
   }
 
-  parts.push(capeLeft > 0 ? `Cape ${Math.ceil(capeLeft / 1000)}s` : "Cape inactive");
+  if (level?.tunnel) {
+    parts.push("Dig ↓");
+  } else {
+    parts.push(capeLeft > 0 ? `Cape ${Math.ceil(capeLeft / 1000)}s` : "Cape inactive");
+  }
 
   let tone = "level";
   if (state.toyHeld || capeLeft > 0) tone = "boost";
@@ -786,9 +994,273 @@ function runSummaryPower(level = levelRuntime) {
   return { text: parts.join(" · "), tone };
 }
 
+function runSummaryPowerMeter(level = levelRuntime) {
+  if (state.mode === "start" || state.mode === "title") {
+    const preview = launchStatePowerPreview(level);
+    return { progress: 100, state: preview.meterState, label: preview.label };
+  }
+  if (state.mode === "paused") {
+    return { progress: 100, state: "paused", label: "Power timers are frozen while paused." };
+  }
+  if (state.mode === "dead" || state.mode === "gameover") {
+    return { progress: 0, state: "reset", label: "Power state resets on restart." };
+  }
+  if (state.mode === "won") {
+    return { progress: 100, state: "clear", label: "Victory reached." };
+  }
+
+  const barkLeft = Math.max(0, state.combat.barkCooldownUntil - Date.now());
+  const capeLeft = Math.max(0, state.capeUntil - Date.now());
+  const barkProgress = Math.max(0, Math.min(100, ((BARK_COOLDOWN_MS - barkLeft) / BARK_COOLDOWN_MS) * 100));
+  const capeProgress = Math.max(0, Math.min(100, (capeLeft / CAPE_FLIGHT_MS) * 100));
+
+  if (state.toyHeld) {
+    return { progress: 100, state: "toy", label: "Toy toss is ready to throw." };
+  }
+  if (capeLeft > 0 && !level?.tunnel) {
+    return {
+      progress: capeProgress,
+      state: "cape",
+      label: `Cape flight remains active for ${Math.ceil(capeLeft / 1000)} more second${capeLeft > 1000 ? "s" : ""}.`
+    };
+  }
+  if (barkLeft > 0) {
+    return {
+      progress: barkProgress,
+      state: "recharge",
+      label: `Super bark recharges in ${Math.ceil(barkLeft / 1000)} second${barkLeft > 1000 ? "s" : ""}.`
+    };
+  }
+  return {
+    progress: 100,
+    state: level?.boss && !level.boss.dead ? "boss-ready" : "ready",
+    label: level?.tunnel ? "Super bark is ready and dig stays available." : "Super bark is ready."
+  };
+}
+
 function levelProgressPercent() {
   const current = Math.min(LEVELS.length, Math.max(1, (state.currentLevelIndex || 0) + 1));
   return Math.max(0, Math.min(100, (current / LEVELS.length) * 100));
+}
+
+function levelSelectGoalText(level) {
+  if (!level) return "Goal: finish the run";
+  const steps = [`${level.totalBones} bones`];
+  if (level.tunnel) steps.push("dig dirt");
+  if (level.boss?.name) steps.push(level.boss.name);
+  steps.push("flag");
+  return `Goal: ${steps.join(" • ")}`;
+}
+
+function levelSelectGoalPreview(level) {
+  if (!level) {
+    return { text: "🏁 Finish", label: "Goal: finish the run" };
+  }
+
+  const steps = [{ icon: "🦴", text: String(level.totalBones || 0), label: `${level.totalBones || 0} bone${level.totalBones === 1 ? "" : "s"}` }];
+  if (level.tunnel) {
+    steps.push({ icon: "⬒", text: "Dig", label: "dig dirt" });
+  }
+  if (level.boss?.name) {
+    steps.push({ icon: "♛", text: level.boss.name, label: level.boss.name });
+  }
+  steps.push({ icon: "🏁", text: "Flag", label: "flag" });
+
+  return {
+    text: steps.map(({ icon, text }) => `${icon} ${text}`).join(" • "),
+    label: `Goal: ${steps.map(({ label }) => label).join(" • ")}`,
+  };
+}
+
+function levelSelectHazardText(level) {
+  if (!level) return "Hazards: platforming";
+
+  const hazards = [];
+  if (Array.isArray(level.spikes) && level.spikes.length) {
+    hazards.push(`${level.spikes.length} spike${level.spikes.length === 1 ? "" : "s"}`);
+  }
+  if (Array.isArray(level.enemies) && level.enemies.length) {
+    hazards.push(`${level.enemies.length} ${level.giantEnemies ? "big patrol" : "patrol"}${level.enemies.length === 1 ? "" : "s"}`);
+  }
+  if (Array.isArray(level.lavaPools) && level.lavaPools.length) {
+    hazards.push(`${level.lavaPools.length} lava lane${level.lavaPools.length === 1 ? "" : "s"}`);
+  }
+  if (level.cloud) hazards.push("vanishing clouds");
+  if (level.dark) hazards.push("blackout");
+  if (level.tunnel) hazards.push("dirt walls");
+  if (level.water) hazards.push("currents");
+  if (level.moon) hazards.push("floaty jumps");
+  if (level.boss) hazards.push("boss barks");
+  if (level.sirens?.length) {
+    hazards.push(`${level.sirens.length} siren slow${level.sirens.length === 1 ? "" : " zones"}`);
+  }
+
+  return `Hazards: ${hazards.length ? hazards.join(" • ") : "platforming"}`;
+}
+
+function levelSelectTipText(level) {
+  if (!level) return "Tip: finish the warmup and touch the flag";
+  if (level.tunnel) return "Tip: Hold ↓ to dig, then add BARK to chew through dirt faster.";
+  if (level.water) return "Tip: Paddle with jump taps and stay centered so the currents do not drag you off line.";
+  if (level.moon) return "Tip: Let floaty jumps breathe—tap early and land gently on the next platform.";
+  if (level.cloud) return "Tip: Keep moving once you land because cloud platforms vanish after a short pause.";
+  if (level.dark) return "Tip: Hunt for the light switch fast so hidden routes and threats stop blending into the dark.";
+  if (level.volcano) return "Tip: Keep a forward rhythm over lava gaps so you do not lose speed on the hottest jumps.";
+  if (level.giantEnemies) return "Tip: Give the bigger patrols extra room, then bark or stomp once their lane opens.";
+  if (level.sirens?.length || level.toys?.length) return "Tip: Grab the toy toss pickup quickly to shut down the siren slow before the chase gets messy.";
+  if (level.boss) return "Tip: Save a bark for the boss telegraph, then punish the opening before the next attack starts.";
+  return "Tip: Scoop the bones on your main path first, then finish with a clean flag dash.";
+}
+
+function levelSelectFocusPill(level) {
+  if (!level) return { icon: "🦴", text: "Path bones", label: "Focus: scoop the bones on your main path" };
+  if (level.tunnel) return { icon: "↓", text: "Dig + Bark", label: "Focus: hold down to dig and add bark to chew through dirt faster" };
+  if (level.water) return { icon: "↑", text: "Tap swim", label: "Focus: tap jump to swim through currents" };
+  if (level.moon) return { icon: "◔", text: "Float jumps", label: "Focus: start moon jumps early and land gently" };
+  if (level.cloud) return { icon: "☁", text: "Keep moving", label: "Focus: cloud platforms fade if you wait too long" };
+  if (level.dark) return { icon: "💡", text: "Find switch", label: "Focus: light the stage fast so routes stop hiding" };
+  if (level.volcano) return { icon: "🔥", text: "Clear gaps", label: "Focus: keep your rhythm over the lava lanes" };
+  if (level.giantEnemies) return { icon: "!", text: "Give room", label: "Focus: make space before barking at the big patrols" };
+  if (level.sirens?.length || level.toys?.length) return { icon: "🧸", text: "Grab toy", label: "Focus: grab the toy toss pickup before the sirens stack up" };
+  if (level.boss) return { icon: "♛", text: "Save bark", label: "Focus: save a bark for the boss telegraph opening" };
+  return { icon: "🦴", text: "Path bones", label: "Focus: scoop the bones on your main path" };
+}
+
+function levelSelectHazardPills(level) {
+  if (!level) return [{ icon: "↔", text: "Run", label: "platforming" }];
+
+  const pills = [];
+  if (Array.isArray(level.spikes) && level.spikes.length) {
+    pills.push({ icon: "▲", text: String(level.spikes.length), label: `${level.spikes.length} spike${level.spikes.length === 1 ? "" : "s"}` });
+  }
+  if (Array.isArray(level.enemies) && level.enemies.length) {
+    pills.push({ icon: level.giantEnemies ? "!" : "🐾", text: String(level.enemies.length), label: `${level.enemies.length} ${level.giantEnemies ? "big patrol" : "patrol"}${level.enemies.length === 1 ? "" : "s"}` });
+  }
+  if (Array.isArray(level.lavaPools) && level.lavaPools.length) {
+    pills.push({ icon: "🔥", text: String(level.lavaPools.length), label: `${level.lavaPools.length} lava lane${level.lavaPools.length === 1 ? "" : "s"}` });
+  }
+  if (level.cloud) pills.push({ icon: "☁", text: "Fade", label: "vanishing clouds" });
+  if (level.dark) pills.push({ icon: "◐", text: "Dark", label: "blackout" });
+  if (level.tunnel) pills.push({ icon: "⬒", text: "Dig", label: "dirt walls" });
+  if (level.water) pills.push({ icon: "≈", text: "Current", label: "currents" });
+  if (level.moon) pills.push({ icon: "◔", text: "Float", label: "floaty jumps" });
+  if (level.boss) pills.push({ icon: "♛", text: "Boss", label: "boss barks" });
+  if (level.sirens?.length) {
+    pills.push({ icon: "📢", text: String(level.sirens.length), label: `${level.sirens.length} siren slow${level.sirens.length === 1 ? "" : " zones"}` });
+  }
+
+  return pills.length ? pills : [{ icon: "↔", text: "Run", label: "platforming" }];
+}
+
+function levelSelectPickupPills(level) {
+  if (!level) return [{ icon: "🦴", text: "0", label: "0 bones" }];
+  return [
+    { icon: "🦴", text: String(level.totalBones || 0), label: `${level.totalBones || 0} bone${level.totalBones === 1 ? "" : "s"}` },
+    ...(level.hearts?.length ? [{ icon: "❤️", text: String(level.hearts.length), label: `${level.hearts.length} heart${level.hearts.length === 1 ? "" : "s"}` }] : []),
+    ...(level.capes?.length ? [{ icon: "🦸", text: String(level.capes.length), label: `${level.capes.length} cape${level.capes.length === 1 ? "" : "s"}` }] : []),
+    ...((level.sirens?.length || level.toys?.length) ? [{ icon: "🧸", text: "Toy", label: "toy toss" }] : []),
+  ];
+}
+
+function levelSelectPickupSummary(level) {
+  const pills = levelSelectPickupPills(level);
+  return {
+    text: pills.map(({ icon, text }) => `${icon} ${text}`).join(" • "),
+    label: `Pickups: ${pills.map(({ label }) => label).join(", ")}`,
+  };
+}
+
+function levelSelectLengthText(level) {
+  if (!level) return "Length: Short";
+  const width = Number(level.worldWidth) || 0;
+  if (level.boss || width >= 3600) return "Length: Long";
+  if (width >= 3200) return "Length: Medium";
+  return "Length: Short";
+}
+
+function levelSelectDifficulty(level, idx) {
+  if (!level) return { text: "Challenge: Warmup", tone: "warmup" };
+
+  let score = idx + 1;
+  score += Math.min(3, Math.floor((level.totalBones || 0) / 3));
+  if (Array.isArray(level.spikes) && level.spikes.length) score += 1;
+  if (Array.isArray(level.enemies) && level.enemies.length >= 5) score += 1;
+  if (level.water) score += 1;
+  if (level.moon) score += 1;
+  if (level.cloud) score += 1;
+  if (level.tunnel) score += 1;
+  if (level.dark) score += 1;
+  if (level.volcano) score += 1;
+  if (level.giantEnemies) score += 1;
+  if (level.sirens?.length) score += 1;
+  if (level.boss) score += 3;
+
+  if (level.boss || score >= 19) return { text: "Challenge: Boss", tone: "boss" };
+  if (score >= 14) return { text: "Challenge: Tough", tone: "tough" };
+  if (score >= 9) return { text: "Challenge: Tricky", tone: "tricky" };
+  return { text: "Challenge: Warmup", tone: "warmup" };
+}
+
+function levelSelectChallengeBadge(level, idx) {
+  const challenge = levelSelectDifficulty(level, idx);
+  const iconMap = {
+    warmup: "☀",
+    tricky: "⚠",
+    tough: "🔥",
+    boss: "♛",
+  };
+  return {
+    ...challenge,
+    icon: iconMap[challenge.tone] || "•",
+    badgeText: `${iconMap[challenge.tone] || "•"} ${challenge.text.replace(/^Challenge:\s*/, "")}`,
+  };
+}
+
+function levelSelectThemeKey(level) {
+  if (level?.boss) return "boss";
+  if (level?.dark) return "dark";
+  if (level?.volcano) return "volcano";
+  if (level?.water) return "water";
+  if (level?.moon) return "moon";
+  if (level?.cloud) return "cloud";
+  if (level?.tunnel) return "tunnel";
+  if (level?.giantEnemies) return "giant";
+  return "classic";
+}
+
+function levelSelectStageText(level) {
+  if (level?.boss?.name) return level.boss.name;
+  return runSummaryTheme(level).text.replace(/^Stage\s+/, "");
+}
+
+function levelSelectStageIcon(level) {
+  const theme = levelSelectThemeKey(level);
+  const icons = {
+    classic: "★",
+    water: "≈",
+    moon: "◔",
+    cloud: "☁",
+    tunnel: "⬒",
+    volcano: "▲",
+    giant: "!",
+    dark: "◐",
+    boss: "♛"
+  };
+  return icons[theme] || icons.classic;
+}
+
+function levelSelectLengthBadge(level) {
+  const text = levelSelectLengthText(level).replace(/^Length:\s*/, "");
+  const iconMap = {
+    Short: "⚡",
+    Medium: "↔",
+    Long: "▭",
+  };
+  return {
+    icon: iconMap[text] || "•",
+    text,
+    label: `Length: ${text}`,
+  };
 }
 
 function runSummaryTheme(level = levelRuntime) {
@@ -813,46 +1285,289 @@ function runSummaryTheme(level = levelRuntime) {
   return { text: `Stage ${labels.join(" · ")}`, tone };
 }
 
+function runSummaryThemeAccent(level = levelRuntime) {
+  const themeKey = levelSelectThemeKey(level);
+  const accentMap = {
+    classic: {
+      borderColor: "rgba(141, 212, 255, 0.34)",
+      color: "#f0fbff",
+      boxShadow: "0 0 0 1px rgba(121, 225, 255, 0.08), 0 0 16px rgba(52, 131, 214, 0.12)",
+    },
+    water: {
+      borderColor: "rgba(121, 225, 255, 0.42)",
+      color: "#e9fbff",
+      boxShadow: "0 0 0 1px rgba(121, 225, 255, 0.12), 0 0 18px rgba(79, 153, 255, 0.18)",
+    },
+    moon: {
+      borderColor: "rgba(202, 212, 255, 0.42)",
+      color: "#f1f4ff",
+      boxShadow: "0 0 0 1px rgba(202, 212, 255, 0.12), 0 0 18px rgba(143, 126, 255, 0.18)",
+    },
+    cloud: {
+      borderColor: "rgba(186, 233, 255, 0.4)",
+      color: "#effbff",
+      boxShadow: "0 0 0 1px rgba(186, 233, 255, 0.1), 0 0 18px rgba(118, 198, 255, 0.16)",
+    },
+    tunnel: {
+      borderColor: "rgba(216, 191, 145, 0.38)",
+      color: "#fff1dc",
+      boxShadow: "0 0 0 1px rgba(216, 191, 145, 0.12), 0 0 16px rgba(165, 113, 53, 0.16)",
+    },
+    volcano: {
+      borderColor: "rgba(255, 176, 126, 0.42)",
+      color: "#fff0e5",
+      boxShadow: "0 0 0 1px rgba(255, 176, 126, 0.12), 0 0 18px rgba(255, 111, 73, 0.18)",
+    },
+    giant: {
+      borderColor: "rgba(255, 190, 115, 0.4)",
+      color: "#fff3de",
+      boxShadow: "0 0 0 1px rgba(255, 190, 115, 0.12), 0 0 18px rgba(222, 140, 57, 0.18)",
+    },
+    dark: {
+      borderColor: "rgba(208, 176, 255, 0.4)",
+      color: "#f5ecff",
+      boxShadow: "0 0 0 1px rgba(208, 176, 255, 0.12), 0 0 18px rgba(143, 113, 255, 0.18)",
+    },
+    boss: {
+      borderColor: "rgba(255, 145, 109, 0.48)",
+      color: "#fff0e9",
+      boxShadow: "0 0 0 1px rgba(255, 145, 109, 0.14), 0 0 20px rgba(255, 117, 93, 0.2)",
+    },
+  };
+  return accentMap[themeKey] || accentMap.classic;
+}
+
 function runSummaryLevelText(level = levelRuntime) {
   const current = Math.min(LEVELS.length, Math.max(1, (state.currentLevelIndex || 0) + 1));
-  const bossTag = level?.boss ? " · Boss" : "";
+  const bossTag = level?.boss ? " · ♛ Boss" : "";
   return `Level ${current} of ${LEVELS.length}${bossTag}`;
+}
+
+function launchPreviewLevel() {
+  if (state.mode === "start") return LEVELS[0];
+  return LEVELS[Math.max(0, Math.min(LEVELS.length - 1, state.currentLevelIndex || 0))] || LEVELS[0];
+}
+
+function renderLaunchStatus() {
+  if (!statusEl) return;
+
+  if (state.mode !== "start" && state.mode !== "title") {
+    delete statusEl.dataset.mode;
+    delete statusEl.dataset.theme;
+    statusEl.style.removeProperty("--status-progress");
+    statusEl.removeAttribute("title");
+    return;
+  }
+
+  const level = launchPreviewLevel();
+  const themeKey = levelSelectThemeKey(level);
+  const previewGoal = levelSelectGoalPreview(level);
+  const levelNumber = Math.max(1, Math.min(LEVELS.length, (state.currentLevelIndex || 0) + 1));
+  const levelText = `Level ${levelNumber} of ${LEVELS.length}`;
+  const stageText = level?.boss?.name ? "♛ Boss arena" : `${levelSelectStageIcon(level)} ${levelSelectStageText(level)}`;
+  const progress = Math.max(0, Math.min(100, (levelNumber / LEVELS.length) * 100));
+  const statusText = `Press Start · ${levelText} · ${stageText} · ${previewGoal.text}`;
+
+  statusEl.textContent = statusText;
+  statusEl.dataset.mode = "launch-preview";
+  statusEl.dataset.theme = themeKey;
+  statusEl.style.setProperty("--status-progress", `${progress}%`);
+  statusEl.setAttribute(
+    "aria-label",
+    `Press Start to launch ${levelText}. ${level?.boss?.name ? `Boss stage featuring ${level.boss.name}.` : `Stage ${levelSelectStageText(level)}.`} ${previewGoal.label}.`
+  );
+  statusEl.title = `Preview start: ${Math.round(progress)}% into the 20-level run`;
 }
 
 function renderRunSummary(level = levelRuntime) {
   const summarySection = summaryLevelEl?.parentElement;
   const hudSection = statusEl?.parentElement;
-  const shellTextHidden = state.mode === "start";
-  if (summarySection) summarySection.style.display = shellTextHidden ? "none" : "flex";
-  if (hudSection) hudSection.style.display = shellTextHidden ? "none" : "flex";
+  const stageTipSection = summaryTipEl?.parentElement;
+  const hideSummary = false;
+  const hideHud = state.mode === "start";
+  const showStageTip = state.mode === "start" || state.mode === "title";
+  if (summarySection) summarySection.style.display = hideSummary ? "none" : "flex";
+  if (hudSection) hudSection.style.display = hideHud ? "none" : "flex";
+  if (stageTipSection) {
+    stageTipSection.style.display = showStageTip ? "flex" : "none";
+    stageTipSection.setAttribute("aria-hidden", showStageTip ? "false" : "true");
+    stageTipSection.dataset.theme = levelSelectThemeKey(level);
+  }
 
   if (summaryLevelEl) {
+    const bossLevel = Boolean(level?.boss) && state.mode !== "paused";
+    const progressText = `${Math.round(levelProgressPercent())}% through the 20-level run`;
     summaryLevelEl.textContent = runSummaryLevelText(level);
-    summaryLevelEl.dataset.tone = state.mode === "paused" ? "paused" : "level";
+    summaryLevelEl.dataset.tone = state.mode === "paused" ? "paused" : bossLevel ? "boss-level" : "level";
     summaryLevelEl.style.setProperty("--summary-progress", `${levelProgressPercent()}%`);
+    summaryLevelEl.style.background = bossLevel ? "linear-gradient(135deg, rgba(108, 32, 28, 0.96), rgba(61, 18, 22, 0.92))" : "";
+    summaryLevelEl.style.borderColor = bossLevel ? "rgba(255, 145, 109, 0.48)" : "";
+    summaryLevelEl.style.color = bossLevel ? "#fff0e9" : "";
+    summaryLevelEl.style.boxShadow = bossLevel ? "0 0 0 1px rgba(255, 145, 109, 0.12), 0 0 20px rgba(255, 117, 93, 0.18)" : "";
+    summaryLevelEl.setAttribute(
+      "aria-label",
+      `${runSummaryLevelText(level)}. ${bossLevel ? "Boss checkpoint." : "Campaign progress."} ${progressText}.`
+    );
+    summaryLevelEl.title = `${bossLevel ? "Boss checkpoint" : "Campaign progress"}: ${progressText}`;
   }
 
   if (summaryThemeEl) {
     const theme = runSummaryTheme(level);
-    summaryThemeEl.textContent = theme.text;
+    const accent = runSummaryThemeAccent(level);
+    summaryThemeEl.textContent = `${levelSelectStageIcon(level)} ${theme.text}`;
     summaryThemeEl.dataset.tone = theme.tone;
+    summaryThemeEl.dataset.theme = levelSelectThemeKey(level);
+    summaryThemeEl.style.borderColor = accent.borderColor;
+    summaryThemeEl.style.color = accent.color;
+    summaryThemeEl.style.boxShadow = accent.boxShadow;
   }
 
   if (summaryBonesEl) {
-    summaryBonesEl.textContent = `Bones ${state.bonesCollected}/${state.totalBones}`;
-    summaryBonesEl.dataset.tone = state.bonesCollected >= state.totalBones ? "complete" : "collect";
+    const totalBones = Math.max(0, state.totalBones || 0);
+    const bonesCollected = Math.max(0, Math.min(state.bonesCollected || 0, totalBones || state.bonesCollected || 0));
+    const bonesProgress = totalBones > 0 ? (bonesCollected / totalBones) * 100 : 0;
+    summaryBonesEl.textContent = `Bones ${bonesCollected}/${totalBones}`;
+    summaryBonesEl.dataset.tone = bonesCollected >= totalBones && totalBones > 0 ? "complete" : "collect";
+    summaryBonesEl.style.setProperty("--summary-progress", `${bonesProgress}%`);
+    summaryBonesEl.setAttribute("aria-label", `Bones collected: ${bonesCollected} of ${totalBones}`);
+    summaryBonesEl.title = totalBones > 0 ? `${bonesCollected} of ${totalBones} bones collected` : "No bones in this stage";
+  }
+
+  if (summaryContinuesEl) {
+    const meter = runSummaryContinuesMeter();
+    const continuesLeft = Math.max(0, Math.min(LEVEL_RESPAWNS, state.levelRespawnsLeft || 0));
+    summaryContinuesEl.textContent = `Continues ${continuesLeft}/${LEVEL_RESPAWNS}`;
+    summaryContinuesEl.dataset.tone = meter.tone;
+    summaryContinuesEl.dataset.continuesState = meter.state;
+    summaryContinuesEl.style.setProperty("--summary-progress", `${meter.progress}%`);
+    summaryContinuesEl.setAttribute("aria-label", `Continues status: ${meter.label}`);
+    summaryContinuesEl.title = meter.label;
   }
 
   if (summaryPowerEl) {
     const power = runSummaryPower(level);
+    const meter = runSummaryPowerMeter(level);
     summaryPowerEl.textContent = power.text;
     summaryPowerEl.dataset.tone = power.tone;
+    summaryPowerEl.dataset.powerState = meter.state;
+    summaryPowerEl.style.setProperty("--summary-progress", `${meter.progress}%`);
+    summaryPowerEl.setAttribute("aria-label", `Power status: ${power.text}. ${meter.label}`);
+    summaryPowerEl.title = meter.label;
   }
 
   if (summaryGoalEl) {
     const goal = runSummaryGoal(level);
+    const meter = runSummaryGoalMeter(level);
+    const launchState = state.mode === "start" || state.mode === "title";
     summaryGoalEl.textContent = goal.text;
     summaryGoalEl.dataset.tone = goal.tone;
+    summaryGoalEl.dataset.theme = launchState ? levelSelectThemeKey(level) : "";
+    summaryGoalEl.dataset.goalState = meter.state;
+    summaryGoalEl.style.setProperty("--summary-progress", `${meter.progress}%`);
+    summaryGoalEl.setAttribute("aria-label", `Goal status: ${goal.text}. ${meter.label}`);
+    summaryGoalEl.title = meter.label;
+  }
+
+  if (summaryTipLabelEl) {
+    summaryTipLabelEl.textContent = `${levelSelectStageIcon(level)} ${levelSelectStageText(level)} tip`;
+    summaryTipLabelEl.dataset.theme = levelSelectThemeKey(level);
+  }
+
+  if (summaryTipLevelEl) {
+    const progress = levelProgressPercent();
+    const levelText = runSummaryLevelText(level);
+    summaryTipLevelEl.textContent = levelText;
+    summaryTipLevelEl.dataset.theme = levelSelectThemeKey(level);
+    summaryTipLevelEl.style.setProperty("--stage-tip-level-progress", `${progress}%`);
+    summaryTipLevelEl.setAttribute(
+      "aria-label",
+      `${levelText}. Campaign progress ${Math.round(progress)}% through the 20-level run.`
+    );
+    summaryTipLevelEl.title = `${Math.round(progress)}% through the 20-level run`;
+  }
+
+  if (summaryTipLengthEl) {
+    const length = levelSelectLengthBadge(level);
+    summaryTipLengthEl.textContent = `${length.icon} ${length.text}`;
+    summaryTipLengthEl.dataset.theme = levelSelectThemeKey(level);
+    summaryTipLengthEl.setAttribute("aria-label", length.label);
+    summaryTipLengthEl.title = length.label;
+  }
+
+  if (summaryTipChallengeEl) {
+    const challenge = levelSelectChallengeBadge(level, Math.max(0, state.currentLevelIndex || 0));
+    summaryTipChallengeEl.textContent = challenge.badgeText;
+    summaryTipChallengeEl.dataset.tone = challenge.tone;
+    summaryTipChallengeEl.setAttribute("aria-label", challenge.text);
+    summaryTipChallengeEl.title = challenge.text;
+  }
+
+  if (summaryTipFocusEl) {
+    const focus = levelSelectFocusPill(level);
+    summaryTipFocusEl.textContent = `${focus.icon} ${focus.text}`;
+    summaryTipFocusEl.dataset.theme = levelSelectThemeKey(level);
+    summaryTipFocusEl.setAttribute("aria-label", focus.label);
+    summaryTipFocusEl.title = focus.label;
+  }
+
+  if (summaryTipHazardsEl) {
+    const hazardPills = levelSelectHazardPills(level);
+    summaryTipHazardsEl.replaceChildren();
+    summaryTipHazardsEl.setAttribute(
+      "aria-label",
+      `Upcoming stage hazards: ${hazardPills.map((pill) => pill.label).join(", ")}`
+    );
+
+    hazardPills.forEach(({ icon, text, label }) => {
+      const pillEl = document.createElement("span");
+      pillEl.className = "stage-tip-hazard-pill";
+      pillEl.dataset.theme = levelSelectThemeKey(level);
+      pillEl.setAttribute("aria-label", label);
+
+      const iconEl = document.createElement("span");
+      iconEl.className = "stage-tip-hazard-icon";
+      iconEl.textContent = icon;
+      iconEl.setAttribute("aria-hidden", "true");
+
+      const textEl = document.createElement("span");
+      textEl.className = "stage-tip-hazard-text";
+      textEl.textContent = text;
+
+      pillEl.append(iconEl, textEl);
+      summaryTipHazardsEl.appendChild(pillEl);
+    });
+  }
+
+  if (summaryTipPickupsEl) {
+    const pickupPills = levelSelectPickupPills(level);
+    summaryTipPickupsEl.replaceChildren();
+    summaryTipPickupsEl.setAttribute(
+      "aria-label",
+      `Upcoming stage pickups: ${pickupPills.map((pill) => pill.label).join(", ")}`
+    );
+
+    pickupPills.forEach(({ icon, text, label }) => {
+      const pillEl = document.createElement("span");
+      pillEl.className = "stage-tip-pickup-pill";
+      pillEl.dataset.theme = levelSelectThemeKey(level);
+      pillEl.setAttribute("aria-label", label);
+
+      const iconEl = document.createElement("span");
+      iconEl.className = "stage-tip-pickup-icon";
+      iconEl.textContent = icon;
+      iconEl.setAttribute("aria-hidden", "true");
+
+      const textEl = document.createElement("span");
+      textEl.className = "stage-tip-pickup-text";
+      textEl.textContent = text;
+
+      pillEl.append(iconEl, textEl);
+      summaryTipPickupsEl.appendChild(pillEl);
+    });
+  }
+
+  if (summaryTipEl) {
+    summaryTipEl.textContent = levelSelectTipText(level);
   }
 }
 
@@ -896,7 +1611,120 @@ function goToStartScreen() {
   levelRuntime = hydrateLevelRuntime(LEVELS[0]);
   resetPlayerPosition();
   renderLives();
-  statusEl.textContent = "Press Start.";
+  renderLaunchStatus();
+}
+
+function renderHenryProgress() {
+  const level = LEVELS[state.currentLevelIndex] || LEVELS[0];
+  const showingDefaultStart = !["playing", "paused", "dead"].includes(state.mode);
+  const levelText = `${showingDefaultStart ? "Default start" : "Current run"} · ${runSummaryLevelText(level)}`;
+  const themeKey = levelSelectThemeKey(level);
+  const themeText = levelSelectStageText(level);
+  const themeIcon = levelSelectStageIcon(level);
+  if (henryProgressLevelEl) {
+    const progressPercent = `${Math.min(100, Math.max(5, ((Math.max(0, state.currentLevelIndex || 0) + 1) / LEVELS.length) * 100))}%`;
+    henryProgressLevelEl.textContent = levelText;
+    henryProgressLevelEl.dataset.tone = showingDefaultStart ? "default" : "current";
+    henryProgressLevelEl.style.setProperty("--henry-progress-level-fill", progressPercent);
+    henryProgressLevelEl.setAttribute("aria-label", `${levelText}, campaign progress ${progressPercent}`);
+    henryProgressLevelEl.title = `Campaign progress ${progressPercent}`;
+  }
+  if (henryProgressThemeEl) {
+    const themeText = level?.boss?.name ? `Boss · ${level.boss.name}` : `Stage ${levelSelectStageText(level)}`;
+    henryProgressThemeEl.textContent = `${themeIcon} ${themeText}`;
+    henryProgressThemeEl.dataset.tone = "theme";
+    henryProgressThemeEl.dataset.theme = themeKey;
+    henryProgressThemeEl.setAttribute("aria-label", themeText);
+    henryProgressThemeEl.title = themeText;
+  }
+  if (henryProgressChallengeEl) {
+    const difficulty = levelSelectChallengeBadge(level, state.currentLevelIndex || 0);
+    henryProgressChallengeEl.textContent = difficulty.badgeText;
+    henryProgressChallengeEl.dataset.tone = "challenge";
+    henryProgressChallengeEl.dataset.challengeTone = difficulty.tone;
+    henryProgressChallengeEl.setAttribute("aria-label", difficulty.text);
+    henryProgressChallengeEl.title = difficulty.text;
+  }
+  if (henryProgressLengthEl) {
+    const length = levelSelectLengthBadge(level);
+    henryProgressLengthEl.textContent = `${length.icon} ${length.text}`;
+    henryProgressLengthEl.dataset.tone = "length";
+    henryProgressLengthEl.dataset.theme = themeKey;
+    henryProgressLengthEl.setAttribute("aria-label", length.label);
+    henryProgressLengthEl.title = length.label;
+  }
+  if (henryProgressGoalEl) {
+    const goalPreview = levelSelectGoalPreview(level);
+    henryProgressGoalEl.textContent = goalPreview.text;
+    henryProgressGoalEl.dataset.tone = "goal";
+    henryProgressGoalEl.dataset.theme = themeKey;
+    henryProgressGoalEl.setAttribute("aria-label", goalPreview.label);
+    henryProgressGoalEl.title = goalPreview.label;
+  }
+  if (henryProgressPickupsEl) {
+    const pickupSummary = levelSelectPickupSummary(level);
+    henryProgressPickupsEl.textContent = pickupSummary.text;
+    henryProgressPickupsEl.dataset.tone = "pickup";
+    henryProgressPickupsEl.dataset.theme = themeKey;
+    henryProgressPickupsEl.setAttribute("aria-label", pickupSummary.label);
+    henryProgressPickupsEl.title = pickupSummary.label;
+  }
+  if (henryProgressHazardsEl) {
+    const hazardPills = levelSelectHazardPills(level);
+    const hazardSummaryText = hazardPills.map(({ icon, text }) => `${icon} ${text}`).join(" • ");
+    const hazardSummaryLabel = `Hazards: ${hazardPills.map(({ label }) => label).join(", ")}`;
+    henryProgressHazardsEl.textContent = hazardSummaryText;
+    henryProgressHazardsEl.dataset.tone = "hazard";
+    henryProgressHazardsEl.dataset.theme = themeKey;
+    henryProgressHazardsEl.setAttribute("aria-label", hazardSummaryLabel);
+    henryProgressHazardsEl.title = hazardSummaryLabel;
+  }
+  if (henryProgressFocusEl) {
+    const focus = levelSelectFocusPill(level);
+    henryProgressFocusEl.textContent = `${focus.icon} ${focus.text}`;
+    henryProgressFocusEl.dataset.tone = "focus";
+    henryProgressFocusEl.dataset.theme = themeKey;
+    henryProgressFocusEl.setAttribute("aria-label", focus.label);
+    henryProgressFocusEl.title = focus.label;
+  }
+  if (henryProgressTipEl) {
+    const tipText = levelSelectTipText(level);
+    henryProgressTipEl.textContent = `💡 Tip: ${tipText.replace(/^Tip:\s*/, "")}`;
+    henryProgressTipEl.dataset.tone = "tip";
+    henryProgressTipEl.dataset.theme = themeKey;
+    henryProgressTipEl.setAttribute("aria-label", tipText);
+    henryProgressTipEl.title = tipText;
+  }
+  if (henryProgressJumpBtn) {
+    const targetLevelLabel = `Level ${Math.max(1, (state.currentLevelIndex || 0) + 1)}`;
+    const runModeLabel = showingDefaultStart ? "Default start" : "Current run";
+    henryProgressJumpBtn.dataset.theme = themeKey;
+    henryProgressJumpBtn.dataset.mode = showingDefaultStart ? "default" : "current";
+    henryProgressJumpBtn.title = `${runModeLabel} · ${themeText} quick jump`;
+    henryProgressJumpBtn.replaceChildren();
+
+    const modeBadge = document.createElement("span");
+    modeBadge.className = "henry-progress-action-mode";
+    modeBadge.textContent = runModeLabel;
+    modeBadge.setAttribute("aria-hidden", "true");
+
+    const themeBadge = document.createElement("span");
+    themeBadge.className = "henry-progress-action-theme";
+    themeBadge.textContent = `${themeIcon} ${themeText}`;
+    themeBadge.setAttribute("aria-hidden", "true");
+
+    const label = document.createElement("span");
+    label.className = "henry-progress-action-label";
+    label.textContent = showingDefaultStart ? `Jump to ${targetLevelLabel}` : `Resume ${targetLevelLabel}`;
+
+    henryProgressJumpBtn.append(modeBadge, themeBadge, label);
+    henryProgressJumpBtn.setAttribute(
+      "aria-label",
+      showingDefaultStart
+        ? `Jump straight to the default start on ${targetLevelLabel}, ${themeText.toLowerCase()} stage`
+        : `Jump straight back into the current run on ${targetLevelLabel}, ${themeText.toLowerCase()} stage`
+    );
+  }
 }
 
 function openLevelSelect() {
@@ -910,15 +1738,59 @@ function openLevelSelect() {
   levelSelectEl.style.backgroundPosition = "center";
   levelSelectEl.style.backgroundSize = "50% auto";
   levelSelectEl.classList.remove("hidden");
+  renderHenryProgress();
   levelListEl.innerHTML = "";
+  let currentLevelBtn = null;
 
   LEVELS.forEach((lvl, idx) => {
     const btn = document.createElement("button");
     btn.className = "level-btn";
+    btn.dataset.theme = levelSelectThemeKey(lvl);
+
+    const isCurrentLevel = idx === state.currentLevelIndex;
+    if (isCurrentLevel) {
+      btn.dataset.current = "true";
+    }
 
     const levelLabel = document.createElement("span");
     levelLabel.className = "level-btn-number";
     levelLabel.textContent = `Level ${idx + 1}`;
+
+    const currentBadge = document.createElement("span");
+    currentBadge.className = "level-btn-current";
+    currentBadge.textContent = state.mode === "start" ? "Default" : "Current";
+    currentBadge.hidden = !isCurrentLevel;
+
+    const stage = document.createElement("span");
+    stage.className = "level-btn-stage";
+
+    const stageIcon = document.createElement("span");
+    stageIcon.className = "level-btn-stage-icon";
+    stageIcon.textContent = levelSelectStageIcon(lvl);
+    stageIcon.setAttribute("aria-hidden", "true");
+
+    const stageText = document.createElement("span");
+    stageText.className = "level-btn-stage-text";
+    stageText.textContent = levelSelectStageText(lvl);
+
+    stage.append(stageIcon, stageText);
+
+    const difficulty = document.createElement("span");
+    difficulty.className = "level-btn-difficulty";
+    const difficultyMeta = levelSelectChallengeBadge(lvl, idx);
+    difficulty.textContent = difficultyMeta.badgeText;
+    difficulty.dataset.tone = difficultyMeta.tone;
+
+    const length = document.createElement("span");
+    length.className = "level-btn-length";
+    length.textContent = levelSelectLengthText(lvl);
+
+    const focus = document.createElement("span");
+    focus.className = "level-btn-focus";
+    const focusMeta = levelSelectFocusPill(lvl);
+    focus.textContent = `${focusMeta.icon} ${focusMeta.text}`;
+    focus.setAttribute("aria-label", focusMeta.label);
+    focus.title = focusMeta.label;
 
     const pickupBits = [`${lvl.totalBones} bones`];
     if (lvl.hearts?.length) pickupBits.push(`${lvl.hearts.length} heart${lvl.hearts.length === 1 ? "" : "s"}`);
@@ -927,7 +1799,42 @@ function openLevelSelect() {
 
     const stats = document.createElement("span");
     stats.className = "level-btn-stats";
-    stats.textContent = pickupBits.join(" • ");
+    stats.setAttribute("aria-label", `Pickups: ${pickupBits.join(", ")}`);
+
+    const pickupPills = levelSelectPickupPills(lvl);
+
+    pickupPills.forEach(({ icon, text, label }) => {
+      const pill = document.createElement("span");
+      pill.className = "level-btn-stat-pill";
+      pill.setAttribute("aria-label", label);
+
+      const iconEl = document.createElement("span");
+      iconEl.className = "level-btn-stat-icon";
+      iconEl.textContent = icon;
+      iconEl.setAttribute("aria-hidden", "true");
+
+      const textEl = document.createElement("span");
+      textEl.className = "level-btn-stat-text";
+      textEl.textContent = text;
+
+      pill.append(iconEl, textEl);
+      stats.appendChild(pill);
+    });
+
+    const hazards = document.createElement("span");
+    hazards.className = "level-btn-hazards";
+    hazards.textContent = levelSelectHazardText(lvl);
+
+    const goal = document.createElement("span");
+    goal.className = "level-btn-goal";
+    const goalPreview = levelSelectGoalPreview(lvl);
+    goal.textContent = goalPreview.text;
+    goal.setAttribute("aria-label", goalPreview.label);
+    goal.title = goalPreview.label;
+
+    const tip = document.createElement("span");
+    tip.className = "level-btn-tip";
+    tip.textContent = levelSelectTipText(lvl);
 
     const badges = [];
     if (lvl.water) badges.push("Swim");
@@ -945,17 +1852,23 @@ function openLevelSelect() {
     meta.className = "level-btn-meta";
     meta.textContent = badges.length ? badges.join(" • ") : "Classic run";
 
-    btn.append(levelLabel, stats, meta);
+    btn.append(levelLabel, currentBadge, stage, difficulty, length, focus, goal, tip, hazards, stats, meta);
     btn.setAttribute(
       "aria-label",
-      `${lvl.name}, ${pickupBits.join(", ")}${badges.length ? `, ${badges.join(", ")}` : ", classic run"}`
+      `${isCurrentLevel ? `${state.mode === "start" ? "Default start, " : "Current level, "}` : ""}${lvl.name}, ${difficultyMeta.text.replace(/^Challenge:\s*/, "challenge ")}, ${levelSelectHazardText(lvl).replace(/^Hazards:\s*/, "")}, ${pickupBits.join(", ")}${badges.length ? `, ${badges.join(", ")}` : ", classic run"}`
     );
+    if (isCurrentLevel) currentLevelBtn = btn;
     btn.addEventListener("click", () => {
       closeLevelSelect();
       loadLevel(idx, { resetLives: true });
       statusEl.textContent = `${lvl.name}: Cheat start activated.`;
     });
     levelListEl.appendChild(btn);
+  });
+
+  requestAnimationFrame(() => {
+    currentLevelBtn?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    currentLevelBtn?.focus({ preventScroll: true });
   });
 }
 
@@ -965,6 +1878,84 @@ function closeLevelSelect() {
   levelSelectEl.classList.add("hidden");
   levelSelectEl.style.backgroundImage = "";
   setBgVolume(0.18);
+}
+
+function getLevelSelectButtons() {
+  return levelListEl ? [...levelListEl.querySelectorAll(".level-btn")] : [];
+}
+
+function getLevelSelectFocusedButton() {
+  const active = document.activeElement;
+  if (active instanceof HTMLElement && active.classList.contains("level-btn")) return active;
+  return getLevelSelectButtons().find((btn) => btn.dataset.current === "true") || getLevelSelectButtons()[0] || null;
+}
+
+function levelSelectRows() {
+  const buttons = getLevelSelectButtons();
+  const rows = [];
+  buttons.forEach((btn) => {
+    const rect = btn.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const row = rows.find((entry) => Math.abs(entry.top - rect.top) < 12);
+    const item = { btn, centerX };
+    if (row) {
+      row.items.push(item);
+    } else {
+      rows.push({ top: rect.top, items: [item] });
+    }
+  });
+  rows.forEach((row) => row.items.sort((a, b) => a.centerX - b.centerX));
+  return rows;
+}
+
+function moveLevelSelectFocus(direction) {
+  const current = getLevelSelectFocusedButton();
+  if (!current) return false;
+
+  const rows = levelSelectRows();
+  let rowIndex = -1;
+  let colIndex = -1;
+
+  rows.some((row, rIdx) => {
+    const cIdx = row.items.findIndex((item) => item.btn === current);
+    if (cIdx >= 0) {
+      rowIndex = rIdx;
+      colIndex = cIdx;
+      return true;
+    }
+    return false;
+  });
+
+  if (rowIndex < 0 || colIndex < 0) return false;
+
+  const currentItem = rows[rowIndex].items[colIndex];
+  let target = null;
+
+  if (direction === "left") {
+    target = rows[rowIndex].items[colIndex - 1]?.btn || current;
+  } else if (direction === "right") {
+    target = rows[rowIndex].items[colIndex + 1]?.btn || current;
+  } else if (direction === "up" || direction === "down") {
+    const nextRow = rows[rowIndex + (direction === "up" ? -1 : 1)];
+    if (nextRow) {
+      target = nextRow.items.reduce((best, item) => {
+        if (!best) return item;
+        return Math.abs(item.centerX - currentItem.centerX) < Math.abs(best.centerX - currentItem.centerX) ? item : best;
+      }, null)?.btn || current;
+    } else {
+      target = current;
+    }
+  } else if (direction === "home") {
+    target = rows[0]?.items[0]?.btn || current;
+  } else if (direction === "end") {
+    const lastRow = rows[rows.length - 1];
+    target = lastRow?.items[lastRow.items.length - 1]?.btn || current;
+  }
+
+  if (!target || target === current) return false;
+  target.focus({ preventScroll: true });
+  target.scrollIntoView({ block: "nearest", inline: "nearest" });
+  return true;
 }
 
 const imgCache = new Map();
@@ -1639,6 +2630,7 @@ function levelPreviewRows(level) {
   if (level.sirens?.length) pickups.push("toy toss");
 
   const threats = ["spikes", "corgi patrols"];
+  if (level.tunnel) threats.push("dirt walls");
   if (level.sirens?.length) threats.push("siren slowdown");
   if (level.boss) threats.push(level.boss.name);
 
@@ -1646,11 +2638,17 @@ function levelPreviewRows(level) {
     ? `${level.totalBones} bones • defeat ${level.boss.name} • finish flag`
     : `${level.totalBones} bones + finish flag`;
 
-  return [
+  const rows = [
     { label: "Goal", value: goal },
     { label: "Pickups", value: pickups.length ? pickups.join(" • ") : "no special pickup this round" },
     { label: "Watch for", value: threats.join(" • ") },
   ];
+
+  if (level.tunnel) {
+    rows.push({ label: "Dig", value: "hold ↓ to dig • add BARK to chew faster" });
+  }
+
+  return rows;
 }
 
 function roundedRectPath(x, y, w, h, r) {
@@ -1711,13 +2709,17 @@ function drawCenteredChipRow(y, items, options = {}) {
   });
 }
 
-function drawStartPromptCard(y, text) {
+function drawStartPromptCard(y, text, hint = "") {
   const pulse = (Math.sin(Date.now() / 280) + 1) / 2;
   ctx.save();
   ctx.font = "bold 20px 'Roboto', system-ui";
   const paddingX = 22;
-  const width = ctx.measureText(text).width + paddingX * 2;
-  const height = 44;
+  const hintPaddingX = 18;
+  const primaryWidth = ctx.measureText(text).width + paddingX * 2;
+  ctx.font = "13px 'Roboto', system-ui";
+  const hintWidth = hint ? ctx.measureText(hint).width + hintPaddingX * 2 : 0;
+  const width = Math.max(primaryWidth, hintWidth);
+  const height = hint ? 62 : 44;
   const x = canvas.width / 2 - width / 2;
 
   ctx.shadowColor = `rgba(120, 225, 255, ${0.18 + pulse * 0.24})`;
@@ -1733,7 +2735,13 @@ function drawStartPromptCard(y, text) {
   ctx.fillStyle = "#eafcff";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(text, canvas.width / 2, y + height / 2 + 1);
+  ctx.font = "bold 20px 'Roboto', system-ui";
+  ctx.fillText(text, canvas.width / 2, y + (hint ? 21 : height / 2) + 1);
+  if (hint) {
+    ctx.fillStyle = "rgba(224, 245, 255, 0.86)";
+    ctx.font = "13px 'Roboto', system-ui";
+    ctx.fillText(hint, canvas.width / 2, y + 46);
+  }
   ctx.restore();
 }
 
@@ -1742,8 +2750,8 @@ function drawLevelPreviewCard(x, y, level) {
   if (!rows.length) return;
 
   const width = 540;
-  const height = 150;
   const rowGap = 28;
+  const height = Math.max(150, 92 + rows.length * rowGap);
 
   ctx.save();
   ctx.fillStyle = "rgba(8, 16, 32, 0.9)";
@@ -1776,7 +2784,7 @@ function drawLevelPreviewCard(x, y, level) {
 
   ctx.fillStyle = "rgba(210, 240, 255, 0.82)";
   ctx.font = "13px 'Roboto', system-ui";
-  ctx.fillText("Each level still restocks 3 continues before you jump in.", x + 20, y + 115);
+  ctx.fillText("Each level still restocks 3 continues before you jump in.", x + 20, y + 52 + rows.length * rowGap + 7);
 
   const pulse = (Math.sin(Date.now() / 280) + 1) / 2;
   const promptY = y + height - 34;
@@ -1854,18 +2862,7 @@ function loadLevel(index, options = {}) {
 
   resetPlayerPosition();
   const bossHint = levelRuntime.boss ? " Boss first." : "";
-  const musicSrc = levelRuntime.boss
-    ? BOSS_MUSIC
-    : levelRuntime.id === 1
-      ? LEVEL_ONE_MUSIC
-      : levelRuntime.water
-        ? WATER_LEVEL_MUSIC
-        : levelRuntime.volcano
-          ? LAVA_LEVEL_MUSIC
-          : levelRuntime.giantEnemies
-            ? GIANT_LEVEL_MUSIC
-            : MAIN_MUSIC;
-  setBgTrack(musicSrc);
+  setBgTrack(levelMusicProfile(levelRuntime).src);
 
   statusEl.textContent = `${levelRuntime.name}: ${state.totalBones} bones.${bossHint}`;
 }
@@ -2855,10 +3852,21 @@ function drawPlatform(p) {
     const shade = unstable ? "rgba(201, 188, 255, 0.78)" : "rgba(199, 227, 255, 0.82)";
     const rim = unstable ? "rgba(144, 126, 214, 0.34)" : "rgba(158, 204, 255, 0.3)";
     const puffWidth = p.w / puffCount;
+    const warningProgress = unstable ? Math.max(0, (collapseProgress - 0.32) / 0.68) : 0;
+    const sway = warningProgress > 0 ? Math.sin(now * 0.03 + p.x * 0.02) * 4.5 * warningProgress : 0;
+    const sag = warningProgress > 0 ? 10 * warningProgress : 0;
+    const squishY = 1 - warningProgress * 0.15;
+    const squishX = 1 + warningProgress * 0.04;
 
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.fillStyle = "rgba(154, 190, 225, 0.22)";
+    ctx.translate(sway, sag);
+    if (unstable && warningProgress > 0) {
+      ctx.scale(squishX, squishY);
+      ctx.translate((-p.x - p.w / 2) * (squishX - 1), (-p.y - p.h / 2) * (squishY - 1));
+    }
+
+    ctx.fillStyle = unstable && warningProgress > 0 ? "rgba(178, 160, 226, 0.24)" : "rgba(154, 190, 225, 0.22)";
     ctx.beginPath();
     ctx.ellipse(p.x + p.w / 2, p.y + p.h - 2, p.w * 0.44, Math.max(8, p.h * 0.35), 0, 0, Math.PI * 2);
     ctx.fill();
@@ -2884,6 +3892,21 @@ function drawPlatform(p) {
     ctx.beginPath();
     ctx.ellipse(p.x + p.w / 2, p.y + p.h * 0.54, p.w * 0.46, Math.max(10, p.h * 0.52), 0, Math.PI * 1.02, Math.PI * 1.98);
     ctx.stroke();
+
+    if (unstable && warningProgress > 0) {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalAlpha = alpha;
+      const worldCenterX = p.x + p.w / 2 + sway;
+      const worldTopY = p.y + sag;
+      ctx.fillStyle = `rgba(255,255,255,${0.3 + warningProgress * 0.18})`;
+      for (let i = 0; i < 3; i++) {
+        const puffX = worldCenterX + (i - 1) * (18 + i * 3) + Math.sin(now * 0.02 + p.x * 0.01 + i) * 6;
+        const puffY = worldTopY - 8 - warningProgress * (10 + i * 6) - ((now * 0.04 + i * 9) % 12);
+        ctx.beginPath();
+        ctx.arc(puffX, puffY, 6 - i * 1.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
     ctx.restore();
     return;
   }
@@ -3464,18 +4487,43 @@ function drawDachshund(dog) {
 }
 
 function drawFlag(flag) {
-  ctx.fillStyle = "#ddd";
-  ctx.fillRect(flag.x, flag.y, 4, flag.h);
   const level = levelRuntime;
   const bossDone = !level.boss || level.boss.dead;
   const canExit = state.bonesCollected === state.totalBones && bossDone;
+  const now = Date.now();
+
+  ctx.save();
+  if (canExit) {
+    const glow = 0.55 + Math.sin(now * 0.01) * 0.18;
+    ctx.shadowColor = `rgba(93, 255, 162, ${0.45 + glow * 0.35})`;
+    ctx.shadowBlur = 18 + glow * 10;
+  }
+
+  ctx.fillStyle = "#ddd";
+  ctx.fillRect(flag.x, flag.y, 4, flag.h);
+
+  const flutter = canExit ? Math.sin(now * 0.016) * 6 : 0;
   ctx.fillStyle = canExit ? "#4cff88" : "#f6d365";
   ctx.beginPath();
   ctx.moveTo(flag.x + 4, flag.y + 5);
-  ctx.lineTo(flag.x + 40, flag.y + 16);
+  ctx.lineTo(flag.x + 40 + flutter, flag.y + 16);
   ctx.lineTo(flag.x + 4, flag.y + 28);
   ctx.closePath();
   ctx.fill();
+
+  if (canExit) {
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "rgba(225, 255, 234, 0.9)";
+    for (let i = 0; i < 3; i++) {
+      const drift = ((now * (0.05 + i * 0.012)) + i * 24) % 42;
+      const sparkleX = flag.x + 18 + i * 11 + Math.sin(now * 0.013 + i) * 4;
+      const sparkleY = flag.y + 30 - drift;
+      ctx.beginPath();
+      ctx.arc(sparkleX, sparkleY, i === 1 ? 3.2 : 2.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
 }
 
 function drawBarkIcon(x, y, ready, cooldownLeftMs) {
@@ -3657,6 +4705,33 @@ function getActiveMobileZones() {
   return zones;
 }
 
+function getMobilePortalChipRect() {
+  return { x: canvas.width - 128, y: 12, w: 108, h: 34 };
+}
+
+function mobilePortalChipVisible() {
+  return mobileControlState.immersive && (state.mode === "start" || state.mode === "title");
+}
+
+function drawMobilePortalChip() {
+  if (!mobilePortalChipVisible()) return;
+  const rect = getMobilePortalChipRect();
+  ctx.save();
+  ctx.fillStyle = "rgba(106, 47, 127, 0.88)";
+  ctx.strokeStyle = "rgba(255, 219, 255, 0.82)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(rect.x, rect.y, rect.w, rect.h, 999);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#fff5ff";
+  ctx.font = "bold 15px 'Roboto', system-ui";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("HENRY", rect.x + rect.w / 2, rect.y + rect.h / 2 + 1);
+  ctx.restore();
+}
+
 function drawMobileTouchGuide() {
   if (!mobileControlState.immersive || state.mode !== "playing") return;
 
@@ -3724,6 +4799,20 @@ function drawMobileTouchGuide() {
     }
 
     ctx.restore();
+  }
+
+  if (levelRuntime?.tunnel) {
+    const centerZone = zonesToDraw[1];
+    ctx.fillStyle = "rgba(8, 17, 35, 0.82)";
+    ctx.strokeStyle = "rgba(255,255,255,0.22)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(centerZone.x + centerZone.w / 2 - 44, zoneY - 26, 88, 22, 999);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "rgba(255,245,220,0.95)";
+    ctx.font = "bold 12px 'Roboto', system-ui";
+    ctx.fillText("HOLD DIG", centerZone.x + centerZone.w / 2, zoneY - 15);
   }
 
   ctx.restore();
@@ -4043,7 +5132,7 @@ function drawOverlay() {
       border: "rgba(159, 229, 255, 0.34)",
       color: "#effaff",
     });
-    drawStartPromptCard(canvas.height / 2 + 166, "▶ Press Start");
+    drawStartPromptCard(canvas.height / 2 + 166, "▶ Press Start", "Enter, Space, W, ↑, or tap ▲");
     ctx.textAlign = "start";
     return;
   }
@@ -4075,7 +5164,7 @@ function drawOverlay() {
         color: "#f4fbff",
       });
     }
-    drawStartPromptCard(canvas.height / 2 + 102, "▶ Press Start");
+    drawStartPromptCard(canvas.height / 2 + 102, "▶ Press Start", "Enter, Space, W, ↑, or tap ▲");
     ctx.textAlign = "start";
     return;
   }
@@ -4202,6 +5291,7 @@ function render() {
   const level = levelRuntime;
   const now = Date.now();
   renderRunSummary(level);
+  renderLaunchStatus();
   const shaking = now < state.shakeUntil ? state.shakeIntensity : 0;
   const shakeX = shaking ? Math.random() * shaking * 2 - shaking : 0;
   const shakeY = shaking ? Math.random() * shaking * 2 - shaking : 0;
@@ -4310,6 +5400,7 @@ function render() {
     ctx.restore();
   }
 
+  drawMobilePortalChip();
   drawMobileTouchGuide();
 
   if (level.boss) {
@@ -4368,66 +5459,128 @@ function render() {
     pauseBtn.classList.toggle("paused", paused);
   }
 
+  const previewLevel =
+    state.mode === "start"
+      ? LEVELS[0]
+      : LEVELS[Math.max(0, Math.min(LEVELS.length - 1, state.currentLevelIndex || 0))] || LEVELS[0];
+  const previewLevelNumber = LEVELS.indexOf(previewLevel) + 1;
+  const previewStage = levelSelectStageText(previewLevel);
+  const previewGoal = levelSelectGoalPreview(previewLevel);
+  const previewStageIcon = levelSelectStageIcon(previewLevel);
+  const previewTheme = levelSelectThemeKey(previewLevel);
+
   if (startDesktopBtn) {
     let label = "Run live";
     let hint = "Run is already in progress";
     let aria = "Run already in progress";
     let disabled = true;
+    let shortcut = "";
 
     if (state.mode === "start") {
-      label = "Start run";
-      hint = "Start from the title screen without using the keyboard";
-      aria = "Start run from the title screen";
+      label = `${previewStageIcon} Start Level ${previewLevelNumber}`;
+      hint = `Start from the title screen with a click or press Enter, Space, W, or ↑`;
+      aria = `Start Level ${previewLevelNumber} from the title screen with Enter, Space, W, or Arrow Up`;
       disabled = false;
+      shortcut = "Enter / Space / W / ↑";
     } else if (state.mode === "paused") {
       label = "Resume run";
       hint = "Resume the paused run with a click";
       aria = "Resume paused run";
       disabled = false;
+      shortcut = "P / Esc";
     } else if (state.mode === "title") {
-      label = "Start level";
-      hint = "Skip the intro card and start this level right away";
-      aria = "Start current level now";
+      label = `${previewStageIcon} Start Level ${previewLevelNumber}`;
+      hint = `Launch ${previewLevel.name} now with a click or press Enter, Space, W, or ↑`;
+      aria = `Start ${previewLevel.name} now with Enter, Space, W, or Arrow Up`;
       disabled = false;
+      shortcut = "Enter / Space / W / ↑";
     } else if (state.mode === "dead") {
       label = "Continue";
-      hint = `Continue from faint state (${state.levelRespawnsLeft} left)`;
-      aria = "Continue after fainting";
+      hint = `Continue from faint state (${state.levelRespawnsLeft} left) with C, Enter, or Space`;
+      aria = "Continue after fainting with C, Enter, or Space";
       disabled = false;
+      shortcut = "C / Enter / Space";
     } else if (state.mode === "gameover") {
       label = "Restart run";
-      hint = "Restart from Level 1 after game over";
-      aria = "Restart run after game over";
+      hint = "Restart from Level 1 with Q, Enter, Space, or Esc after game over";
+      aria = "Restart run after game over with Q, Enter, Space, or Escape";
       disabled = false;
+      shortcut = "Q / Enter / Space";
     }
 
     startDesktopBtn.textContent = label;
+    startDesktopBtn.dataset.shortcut = shortcut;
     startDesktopBtn.disabled = disabled;
+    startDesktopBtn.dataset.state = state.mode;
+    startDesktopBtn.dataset.theme = state.mode === "start" || state.mode === "title" ? previewTheme : "";
     startDesktopBtn.setAttribute("aria-label", aria);
     const hintEl = startDesktopBtn.parentElement?.querySelector(".utility-btn-hint");
     if (hintEl) hintEl.textContent = hint;
+
+    if (startActionContextEl) {
+      const showPreview = state.mode === "start" || state.mode === "title";
+      const previewProgress = Math.max(0, Math.min(100, (previewLevelNumber / LEVELS.length) * 100));
+      const previewText = `Level ${previewLevelNumber} · ${levelSelectStageIcon(previewLevel)} ${previewStage} · ${previewGoal.text}`;
+      startActionContextEl.hidden = !showPreview;
+      startActionContextEl.textContent = previewText;
+      startActionContextEl.dataset.tone = runSummaryTheme(previewLevel).tone;
+      startActionContextEl.dataset.theme = showPreview ? previewTheme : "";
+      startActionContextEl.style.setProperty("--context-progress", showPreview ? `${previewProgress}%` : "0%");
+      startActionContextEl.setAttribute(
+        "aria-label",
+        `Level ${previewLevelNumber} · ${levelSelectStageIcon(previewLevel)} ${previewStage} · ${previewGoal.label}. Preview start is ${Math.round(previewProgress)}% into the 20-level run.`
+      );
+      startActionContextEl.title = `Preview start: ${Math.round(previewProgress)}% into the 20-level run`;
+    }
   }
 
   if (pauseDesktopBtn) {
     const paused = state.mode === "paused";
-    pauseDesktopBtn.textContent = paused ? "Resume" : "Pause";
+    const pauseAvailable = state.mode === "playing" || paused;
+    pauseDesktopBtn.textContent = paused ? "Resume" : pauseAvailable ? "Pause" : "Run first";
+    pauseDesktopBtn.dataset.shortcut = pauseAvailable ? "P / Esc" : "";
+    pauseDesktopBtn.disabled = !pauseAvailable;
     pauseDesktopBtn.classList.toggle("paused", paused);
-    pauseDesktopBtn.setAttribute("aria-label", paused ? "Resume game" : "Pause game");
+    pauseDesktopBtn.setAttribute(
+      "aria-label",
+      paused ? "Resume game" : pauseAvailable ? "Pause game" : "Pause unavailable until the run starts"
+    );
     const hintEl = pauseDesktopBtn.parentElement?.querySelector(".utility-btn-hint");
     if (hintEl) {
       hintEl.innerHTML = paused
         ? "Resume the run with a click or press <kbd>P</kbd> / <kbd>Esc</kbd>"
-        : "Stop or resume a run with a click or press <kbd>P</kbd> / <kbd>Esc</kbd>";
+        : pauseAvailable
+          ? "Stop or resume a run with a click or press <kbd>P</kbd> / <kbd>Esc</kbd>"
+          : "Pause becomes available once a run is in progress.";
     }
+  }
+
+  if (recoveryShortcutCalloutEl) {
+    const showRecoveryShortcuts = state.mode === "dead" || state.mode === "gameover";
+    recoveryShortcutCalloutEl.classList.toggle("hidden", !showRecoveryShortcuts);
+    recoveryShortcutCalloutEl.setAttribute("aria-hidden", showRecoveryShortcuts ? "false" : "true");
   }
 
   if (audioBtn) {
     const muted = AUDIO.muted;
-    audioBtn.textContent = muted ? "🔇 Audio off" : "🔊 Audio on";
+    const previewAudioLevel = state.mode === "start" || state.mode === "title" ? previewLevel : levelRuntime;
+    const musicProfile = levelMusicProfile(previewAudioLevel);
+    const audioTheme = levelSelectThemeKey(previewAudioLevel);
+    audioBtn.textContent = `${muted ? "🔇" : "🔊"} ${musicProfile.label}`;
+    audioBtn.dataset.shortcut = "M";
+    audioBtn.dataset.theme = audioTheme;
     audioBtn.classList.toggle("muted", muted);
-    audioBtn.setAttribute("aria-label", muted ? "Unmute game audio" : "Mute game audio");
+    audioBtn.setAttribute(
+      "aria-label",
+      muted ? `Unmute ${musicProfile.description} and sound effects` : `Mute ${musicProfile.description} and sound effects`
+    );
+    audioBtn.title = muted ? `${musicProfile.label} muted` : `${musicProfile.label} ready`;
     const hintEl = audioBtn.parentElement?.querySelector(".utility-btn-hint");
-    if (hintEl) hintEl.textContent = muted ? "Click or press M to restore music and sound effects" : "Mute music and sound effects with one click or press M";
+    if (hintEl) {
+      hintEl.textContent = muted
+        ? `Click or press M to restore the ${musicProfile.description} and sound effects`
+        : `Mute the ${musicProfile.description} and sound effects with one click or press M`;
+    }
   }
 
   ctx.restore();
@@ -4459,9 +5612,42 @@ function setKey(code, value) {
 }
 
 window.addEventListener("keydown", (e) => {
-  if (e.code === "Escape" && state.levelSelectOpen) {
-    closeLevelSelect();
-    return;
+  if (state.levelSelectOpen) {
+    if (e.code === "Escape") {
+      closeLevelSelect();
+      e.preventDefault();
+      return;
+    }
+
+    if (e.code === "ArrowLeft" && moveLevelSelectFocus("left")) {
+      e.preventDefault();
+      return;
+    }
+    if (e.code === "ArrowRight" && moveLevelSelectFocus("right")) {
+      e.preventDefault();
+      return;
+    }
+    if (e.code === "ArrowUp" && moveLevelSelectFocus("up")) {
+      e.preventDefault();
+      return;
+    }
+    if (e.code === "ArrowDown" && moveLevelSelectFocus("down")) {
+      e.preventDefault();
+      return;
+    }
+    if (e.code === "Home" && moveLevelSelectFocus("home")) {
+      e.preventDefault();
+      return;
+    }
+    if (e.code === "End" && moveLevelSelectFocus("end")) {
+      e.preventDefault();
+      return;
+    }
+    if (["Enter", "Space"].includes(e.code)) {
+      getLevelSelectFocusedButton()?.click();
+      e.preventDefault();
+      return;
+    }
   }
 
   if (e.code === "KeyM") {
@@ -4640,6 +5826,17 @@ function clearMobileCenterTapTimeout() {
   mobileControlState.centerTapTimeout = null;
 }
 
+function clearMobileCenterHoldTimeout() {
+  if (!mobileControlState.centerHoldTimeout) return;
+  window.clearTimeout(mobileControlState.centerHoldTimeout);
+  mobileControlState.centerHoldTimeout = null;
+  mobileControlState.centerHoldTouchId = null;
+}
+
+function releaseMobileDigInput() {
+  state.keys.down = false;
+}
+
 function clearMobileDirectionalInput() {
   mobileControlState.movementSide = null;
   mobileControlState.movementTouchId = null;
@@ -4652,6 +5849,8 @@ function resetMobileTrackedTouches() {
   mobileControlState.activeTouches.clear();
   mobileControlState.movementTouchId = null;
   mobileControlState.movementSide = null;
+  clearMobileCenterHoldTimeout();
+  releaseMobileDigInput();
 }
 
 function getMobileBottomZone(x, y) {
@@ -4688,6 +5887,7 @@ function trackMobileTouch(touch) {
     startAt: Date.now(),
     zone: getMobileBottomZone(touch.clientX, touch.clientY),
     jumpSwipeTriggered: false,
+    centerHoldTriggered: false,
   };
   mobileControlState.activeTouches.set(touch.identifier, tracked);
   return tracked;
@@ -4740,6 +5940,19 @@ function triggerMobileTapJump() {
   }, 90);
 }
 
+function startMobileCenterHold(tracked) {
+  if (!tracked || tracked.zone !== "center") return;
+  clearMobileCenterHoldTimeout();
+  mobileControlState.centerHoldTouchId = tracked.id;
+  mobileControlState.centerHoldTimeout = window.setTimeout(() => {
+    const liveTouch = getTrackedMobileTouch(tracked.id);
+    if (!liveTouch || liveTouch.zone !== "center" || state.mode !== "playing") return;
+    liveTouch.centerHoldTriggered = true;
+    state.keys.down = true;
+    mobileControlState.centerHoldTimeout = null;
+  }, MOBILE_CENTER_HOLD_DIG_MS);
+}
+
 async function requestGameFullscreen() {
   if (!mobileControlState.enabled) return false;
   const targetEl = canvas;
@@ -4767,8 +5980,10 @@ function syncMobileExperience() {
     clearMobileDirectionalInput();
     clearMobileJumpReleaseTimeout();
     clearMobileCenterTapTimeout();
+    clearMobileCenterHoldTimeout();
     mobileControlState.lastCenterTapAt = 0;
     handleJumpRelease();
+    releaseMobileDigInput();
   }
 
   if (mobileOverlayEl) {
@@ -4780,7 +5995,7 @@ function syncMobileExperience() {
   if (mobileOverlayMessageEl) {
     mobileOverlayMessageEl.textContent = mobileControlState.landscape
       ? ""
-      : "Turn your phone sideways. Bottom left/right move Henry, tap or swipe up there to jump, and use the bottom center to bark or double tap for super bark.";
+      : "Turn your phone sideways. Bottom left/right move Henry, tap or swipe up there to jump, hold the bottom center to dig, and double tap there for the HENRY portal on the start screen.";
   }
   if (mobileMotionBtn) {
     mobileMotionBtn.classList.add("hidden");
@@ -4815,6 +6030,12 @@ function handleJumpRelease() {
   state.jumpHeld = false;
 }
 
+function handleMobilePortalAction() {
+  if (state.levelSelectOpen) return;
+  startBgMusic();
+  openLevelSelect();
+}
+
 function handleSingleBarkAction() {
   startBgMusic();
   if (state.mode === "dead") {
@@ -4830,6 +6051,10 @@ function handleSingleBarkAction() {
 
 function handleSuperBarkAction() {
   startBgMusic();
+  if (state.mode === "start" || state.mode === "title") {
+    handleMobilePortalAction();
+    return;
+  }
   if (state.mode === "dead") {
     quitToStart();
     return;
@@ -4851,9 +6076,29 @@ async function primeMobileExperience() {
   syncMobileExperience();
 }
 
+function eventToCanvasPoint(clientX, clientY) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: ((clientX - rect.left) / rect.width) * canvas.width,
+    y: ((clientY - rect.top) / rect.height) * canvas.height,
+  };
+}
+
+function isInsideMobilePortalChip(clientX, clientY) {
+  if (!mobilePortalChipVisible()) return false;
+  const point = eventToCanvasPoint(clientX, clientY);
+  const rect = getMobilePortalChipRect();
+  return point.x >= rect.x && point.x <= rect.x + rect.w && point.y >= rect.y && point.y <= rect.y + rect.h;
+}
+
 canvas.addEventListener("pointerdown", (e) => {
   unlockAudio();
   if (mobileControlState.enabled && e.pointerType !== "mouse") primeMobileExperience();
+  if (mobileControlState.enabled && e.pointerType !== "mouse" && isInsideMobilePortalChip(e.clientX, e.clientY)) {
+    e.preventDefault();
+    handleMobilePortalAction();
+    return;
+  }
   startBgMusic();
   if (state.mode === "start") {
     e.preventDefault();
@@ -4864,14 +6109,40 @@ canvas.addEventListener("pointerdown", (e) => {
   }
 });
 
+function setMobileButtonPressed(id, pressed, pulseMs = 0) {
+  const btn = document.getElementById(id);
+  if (!btn) return;
+  const item = btn.closest(".mobile-control-item");
+
+  if (btn._mobilePressedTimeout) {
+    window.clearTimeout(btn._mobilePressedTimeout);
+    btn._mobilePressedTimeout = null;
+  }
+
+  const apply = (active) => {
+    btn.classList.toggle("is-held", active);
+    item?.classList.toggle("is-held", active);
+  };
+
+  apply(pressed);
+  if (pressed && pulseMs > 0) {
+    btn._mobilePressedTimeout = window.setTimeout(() => {
+      apply(false);
+      btn._mobilePressedTimeout = null;
+    }, pulseMs);
+  }
+}
+
 function bindHoldButton(id, onPress, onRelease = onPress) {
   const btn = document.getElementById(id);
   btn.addEventListener("pointerdown", (e) => {
     e.preventDefault();
+    setMobileButtonPressed(id, true);
     onPress(true);
   });
   const stop = (e) => {
     e.preventDefault();
+    setMobileButtonPressed(id, false);
     onRelease(false);
   };
   btn.addEventListener("pointerup", stop);
@@ -4913,17 +6184,48 @@ bindHoldButton(
 const jumpBtn = document.getElementById("btn-jump");
 jumpBtn.addEventListener("pointerdown", (e) => {
   e.preventDefault();
+  setMobileButtonPressed("btn-jump", true);
   handleJumpPress();
 });
-jumpBtn.addEventListener("pointerup", handleJumpRelease);
-jumpBtn.addEventListener("pointerleave", handleJumpRelease);
-jumpBtn.addEventListener("pointercancel", handleJumpRelease);
+jumpBtn.addEventListener("pointerup", (e) => {
+  setMobileButtonPressed("btn-jump", false);
+  handleJumpRelease(e);
+});
+jumpBtn.addEventListener("pointerleave", (e) => {
+  setMobileButtonPressed("btn-jump", false);
+  handleJumpRelease(e);
+});
+jumpBtn.addEventListener("pointercancel", (e) => {
+  setMobileButtonPressed("btn-jump", false);
+  handleJumpRelease(e);
+});
 
 const barkBtn = document.getElementById("btn-bark");
 if (barkBtn) {
   barkBtn.addEventListener("pointerdown", (e) => {
     e.preventDefault();
+    setMobileButtonPressed("btn-bark", true, 180);
     handleSuperBarkAction();
+  });
+}
+
+const digBtn = document.getElementById("btn-dig");
+if (digBtn) {
+  bindHoldButton(
+    "btn-dig",
+    (v) => {
+      if (state.mode === "playing") state.keys.down = v;
+    },
+    () => releaseMobileDigInput()
+  );
+}
+
+const henryBtn = document.getElementById("btn-henry");
+if (henryBtn) {
+  henryBtn.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    setMobileButtonPressed("btn-henry", true, 220);
+    handleMobilePortalAction();
   });
 }
 
@@ -4931,6 +6233,7 @@ const pauseBtn = document.getElementById("btn-pause");
 if (pauseBtn) {
   pauseBtn.addEventListener("pointerdown", (e) => {
     e.preventDefault();
+    setMobileButtonPressed("btn-pause", true, 220);
     startBgMusic();
     if (state.mode === "playing") {
       pauseGame();
@@ -5022,6 +6325,15 @@ function noteJumpTap() {
 if (closeLevelSelectEl) {
   closeLevelSelectEl.addEventListener("click", () => closeLevelSelect());
 }
+if (henryProgressJumpBtn) {
+  henryProgressJumpBtn.addEventListener("click", () => {
+    const idx = Math.max(0, Math.min(LEVELS.length - 1, state.currentLevelIndex || 0));
+    const level = LEVELS[idx];
+    closeLevelSelect();
+    loadLevel(idx, { resetLives: true });
+    statusEl.textContent = `${level?.name || `Level ${idx + 1}`}: Quick jump activated.`;
+  });
+}
 if (levelSelectEl) {
   levelSelectEl.addEventListener("click", (e) => {
     if (e.target === levelSelectEl) closeLevelSelect();
@@ -5081,6 +6393,13 @@ if (touchControlsBtn) {
   });
 }
 
+if (hideTouchControlsBtn) {
+  hideTouchControlsBtn.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    setTouchControlsVisible(false);
+  });
+}
+
 if (mobileMotionBtn) {
   mobileMotionBtn.addEventListener("click", async () => {
     unlockAudio();
@@ -5105,6 +6424,9 @@ canvas.addEventListener(
       if ((tracked.zone === "left" || tracked.zone === "right") && mobileControlState.movementTouchId == null) {
         mobileControlState.movementTouchId = tracked.id;
       }
+      if (tracked.zone === "center") {
+        startMobileCenterHold(tracked);
+      }
     }
 
     syncMobileMovementTouch();
@@ -5126,6 +6448,9 @@ canvas.addEventListener(
       const deltaY = touch.clientY - tracked.startY;
       if ((tracked.zone === "left" || tracked.zone === "right") && !tracked.jumpSwipeTriggered && deltaY <= -MOBILE_SWIPE_JUMP_MIN) {
         triggerMobileSwipeJump(tracked);
+      }
+      if (tracked.zone !== "center" && mobileControlState.centerHoldTouchId === tracked.id) {
+        clearMobileCenterHoldTimeout();
       }
     }
 
@@ -5150,24 +6475,32 @@ canvas.addEventListener(
       const deltaY = touch.clientY - tracked.startY;
       const isTap = Math.abs(deltaX) < 20 && Math.abs(deltaY) < 20 && touchDuration <= MOBILE_TAP_JUMP_MAX_MS;
 
+      if (mobileControlState.centerHoldTouchId === touch.identifier) {
+        clearMobileCenterHoldTimeout();
+      }
+
       if (tracked.zone === "left" || tracked.zone === "right") {
         if (isTap && !tracked.jumpSwipeTriggered) {
           triggerMobileTapJump();
         }
-      } else if (tracked.zone === "center" && isTap) {
-        const now = Date.now();
-        if (now - mobileControlState.lastCenterTapAt <= MOBILE_DOUBLE_TAP_MS) {
-          clearMobileCenterTapTimeout();
-          mobileControlState.lastCenterTapAt = 0;
-          handleSuperBarkAction();
-        } else {
-          mobileControlState.lastCenterTapAt = now;
-          clearMobileCenterTapTimeout();
-          mobileControlState.centerTapTimeout = window.setTimeout(() => {
-            handleSingleBarkAction();
-            mobileControlState.centerTapTimeout = null;
+      } else if (tracked.zone === "center") {
+        if (tracked.centerHoldTriggered) {
+          releaseMobileDigInput();
+        } else if (isTap) {
+          const now = Date.now();
+          if (now - mobileControlState.lastCenterTapAt <= MOBILE_DOUBLE_TAP_MS) {
+            clearMobileCenterTapTimeout();
             mobileControlState.lastCenterTapAt = 0;
-          }, MOBILE_DOUBLE_TAP_MS);
+            handleSuperBarkAction();
+          } else {
+            mobileControlState.lastCenterTapAt = now;
+            clearMobileCenterTapTimeout();
+            mobileControlState.centerTapTimeout = window.setTimeout(() => {
+              handleSingleBarkAction();
+              mobileControlState.centerTapTimeout = null;
+              mobileControlState.lastCenterTapAt = 0;
+            }, MOBILE_DOUBLE_TAP_MS);
+          }
         }
       }
 
@@ -5187,7 +6520,9 @@ canvas.addEventListener(
   (e) => {
     if (!mobileControlState.enabled) return;
     clearMobileJumpReleaseTimeout();
+    clearMobileCenterHoldTimeout();
     handleJumpRelease();
+    releaseMobileDigInput();
     if (e.changedTouches.length) {
       for (const touch of e.changedTouches) {
         mobileControlState.activeTouches.delete(touch.identifier);
