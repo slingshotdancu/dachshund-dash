@@ -55,7 +55,7 @@
             <div class="utility-action-group">
               <button id="btn-start-desktop" class="utility-btn utility-btn-start" aria-label="Start run from the title screen" data-shortcut="Enter / Space / W / ↑">Start run</button>
               <span id="start-action-context" class="utility-btn-context" aria-live="polite">Level 1 · ★ Classic · 🦴 5 • 🏁 Flag</span>
-              <span class="utility-btn-hint">Start from the title screen with a click or press Enter, Space, W, or ↑</span>
+              <span class="utility-btn-hint">Start from the title screen with a click or press Enter / Space / W / ↑</span>
             </div>
             <div class="utility-action-group">
               <button id="btn-pause-desktop" class="utility-btn utility-btn-pause" aria-label="Pause or resume" data-shortcut="P / Esc">Pause</button>
@@ -77,17 +77,25 @@
         </div>
 
         <div class="controls-help-chips" aria-label="Keyboard tips">
+          <span class="control-chip control-chip-start"><span class="control-chip-label">Start</span> Enter / Space / W / ↑</span>
           <span class="control-chip"><span class="control-chip-label">Move</span> A / D or ← / →</span>
           <span class="control-chip"><span class="control-chip-label">Jump</span> W / ↑ / Space</span>
           <span class="control-chip"><span class="control-chip-label">Bark</span> F / K / Right Shift</span>
           <span class="control-chip"><span class="control-chip-label">Dive</span> S / ↓ while flying</span>
+          <span class="control-chip control-chip-important"><span class="control-chip-label">Pause</span> P / Esc</span>
           <span class="control-chip"><span class="control-chip-label">Restart</span> R</span>
           <span class="control-chip"><span class="control-chip-label">Mute</span> M</span>
         </div>
 
         <div class="secret-code-callout" aria-label="Secret cheat code hint">
           <strong class="secret-code-title">Secret</strong>
-          <span class="secret-code-text">Type <kbd>henry</kbd> to open the hidden level portal.</span>
+          <span class="secret-code-text">
+            Type
+            <span class="secret-code-sequence" aria-label="Type H E N R Y">
+              <kbd>H</kbd><kbd>E</kbd><kbd>N</kbd><kbd>R</kbd><kbd>Y</kbd>
+            </span>
+            to open the hidden level portal.
+          </span>
         </div>
 
         <div id="recovery-shortcut-callout" class="recovery-shortcut-callout hidden" aria-label="Recovery shortcuts" aria-hidden="true">
@@ -102,7 +110,7 @@
       <section id="mobile-controls-panel" class="mobile-controls-panel" aria-label="On-screen controls panel">
         <div class="mobile-controls-heading">
           <strong class="mobile-controls-title">On-screen controls</strong>
-          <span class="mobile-controls-subtitle">▲ start · BARK attack · DIG hold · HENRY portal</span>
+          <span id="mobile-controls-subtitle" class="mobile-controls-subtitle">▲ start · BARK attack · HENRY portal</span>
           <button id="btn-hide-touch-controls" class="utility-btn utility-btn-touch utility-btn-panel-hide" type="button" aria-label="Hide touch controls panel">Hide panel</button>
         </div>
 
@@ -121,19 +129,19 @@
           </div>
           <div class="mobile-control-item mobile-control-item-wide">
             <button id="btn-bark" aria-label="Super bark attack">BARK</button>
-            <span class="mobile-control-caption">Attack</span>
+            <span id="mobile-control-caption-bark" class="mobile-control-caption">Attack</span>
           </div>
           <div class="mobile-control-item mobile-control-item-wide">
             <button id="btn-dig" aria-label="Dig or dive">DIG</button>
-            <span class="mobile-control-caption">Dig / dive</span>
+            <span id="mobile-control-caption-dig" class="mobile-control-caption">Dig / dive</span>
           </div>
           <div class="mobile-control-item mobile-control-item-wide">
             <button id="btn-henry" aria-label="Open the secret Henry level portal">HENRY</button>
             <span class="mobile-control-caption">Secret portal</span>
           </div>
           <div class="mobile-control-item mobile-control-item-wide">
-            <button id="btn-pause" aria-label="Pause or resume">PAUSE</button>
-            <span class="mobile-control-caption">Pause / resume</span>
+            <button id="btn-pause" aria-label="Pause locked until a run starts" disabled>RUN FIRST</button>
+            <span id="mobile-control-caption-pause" class="mobile-control-caption">Pause locked</span>
           </div>
         </div>
       </section>
@@ -157,7 +165,7 @@
             <span id="henry-progress-pickups" class="henry-progress-pill">🦴 5</span>
             <span id="henry-progress-hazards" class="henry-progress-pill">↔ Run</span>
             <span id="henry-progress-focus" class="henry-progress-pill">🦴 Path bones</span>
-            <span id="henry-progress-tip" class="henry-progress-pill henry-progress-pill-tip">💡 Tip: Scoop the bones on your main path first, then finish with a clean flag dash.</span>
+            <span id="henry-progress-tip" class="henry-progress-pill henry-progress-pill-tip">💡 Tip: Path bones first</span>
             <button id="henry-progress-jump" class="henry-progress-action" type="button">Jump to default start</button>
           </div>
           <div class="henry-celebration" aria-hidden="true">

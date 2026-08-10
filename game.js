@@ -18,6 +18,10 @@ const touchControlsBtn = document.getElementById("btn-touch-controls");
 const hideTouchControlsBtn = document.getElementById("btn-hide-touch-controls");
 const audioBtn = document.getElementById("btn-audio");
 const mobileControlsPanelEl = document.getElementById("mobile-controls-panel");
+const mobileControlsSubtitleEl = document.getElementById("mobile-controls-subtitle");
+const mobileBarkCaptionEl = document.getElementById("mobile-control-caption-bark");
+const mobileDigCaptionEl = document.getElementById("mobile-control-caption-dig");
+const mobilePauseCaptionEl = document.getElementById("mobile-control-caption-pause");
 const recoveryShortcutCalloutEl = document.getElementById("recovery-shortcut-callout");
 const summaryLevelEl = document.getElementById("summary-level");
 const summaryThemeEl = document.getElementById("summary-theme");
@@ -57,7 +61,9 @@ const BOSS_MUSIC = "assets/BossLevels.wav";
 const LAVA_LEVEL_MUSIC = "assets/lavalevel.wav";
 const WATER_LEVEL_MUSIC = "assets/waterlevel.wav";
 const MOON_LEVEL_MUSIC = "assets/moonlevel.wav";
+const CLOUD_LEVEL_MUSIC = "assets/newlevel.wav";
 const GIANT_LEVEL_MUSIC = "assets/giantlevel.wav";
+const LIGHTS_LEVEL_MUSIC = "assets/lightslevel.wav";
 const LOGO_IMG = "assets/henry/middle.jpg";
 
 function levelMusicProfile(level) {
@@ -96,11 +102,25 @@ function levelMusicProfile(level) {
       description: "volcano stage soundtrack",
     };
   }
+  if (level?.cloud) {
+    return {
+      src: CLOUD_LEVEL_MUSIC,
+      label: "Cloud mix",
+      description: "cloud stage soundtrack",
+    };
+  }
   if (level?.giantEnemies) {
     return {
       src: GIANT_LEVEL_MUSIC,
       label: "Big Corgi mix",
       description: "big corgi chase soundtrack",
+    };
+  }
+  if (level?.dark) {
+    return {
+      src: LIGHTS_LEVEL_MUSIC,
+      label: "Lights mix",
+      description: "lights stage soundtrack",
     };
   }
   return {
@@ -135,6 +155,7 @@ const MOON_MAX_FALL_SPEED = 6;
 const CLOUD_PLATFORM_HOLD_MS = 2200;
 const CLOUD_PLATFORM_RESPAWN_MS = 3200;
 const DARK_SWITCH_REVEAL_MS = 5000;
+const DARK_SWITCH_BEACON_RADIUS = 38;
 const LAVA_TOP_Y = 510;
 const LAVA_HEIGHT = 30;
 const TUNNEL_DIG_SLOW_MS = 950;
@@ -1047,6 +1068,11 @@ function levelSelectGoalText(level) {
   if (!level) return "Goal: finish the run";
   const steps = [`${level.totalBones} bones`];
   if (level.tunnel) steps.push("dig dirt");
+  if (level.dark) {
+    const switchCount = Array.isArray(level.lightSwitches) ? level.lightSwitches.length : 1;
+    steps.push(`${switchCount} light switch${switchCount === 1 ? "" : "es"}`);
+  }
+  if (level.sirens?.length || level.toys?.length) steps.push("toy toss");
   if (level.boss?.name) steps.push(level.boss.name);
   steps.push("flag");
   return `Goal: ${steps.join(" • ")}`;
@@ -1060,6 +1086,13 @@ function levelSelectGoalPreview(level) {
   const steps = [{ icon: "🦴", text: String(level.totalBones || 0), label: `${level.totalBones || 0} bone${level.totalBones === 1 ? "" : "s"}` }];
   if (level.tunnel) {
     steps.push({ icon: "⬒", text: "Dig", label: "dig dirt" });
+  }
+  if (level.dark) {
+    const switchCount = Array.isArray(level.lightSwitches) ? level.lightSwitches.length : 1;
+    steps.push({ icon: "💡", text: "Switch", label: `${switchCount} light switch${switchCount === 1 ? "" : "es"}` });
+  }
+  if (level.sirens?.length || level.toys?.length) {
+    steps.push({ icon: "🧸", text: "Toy", label: "toy toss" });
   }
   if (level.boss?.name) {
     steps.push({ icon: "♛", text: level.boss.name, label: level.boss.name });
@@ -1110,6 +1143,20 @@ function levelSelectTipText(level) {
   if (level.sirens?.length || level.toys?.length) return "Tip: Grab the toy toss pickup quickly to shut down the siren slow before the chase gets messy.";
   if (level.boss) return "Tip: Save a bark for the boss telegraph, then punish the opening before the next attack starts.";
   return "Tip: Scoop the bones on your main path first, then finish with a clean flag dash.";
+}
+
+function levelSelectPortalTipText(level) {
+  if (!level) return "💡 Tip: Flag finish";
+  if (level.tunnel) return "💡 Tip: ↓ Dig · BARK fast";
+  if (level.water) return "💡 Tip: Tap swim · stay centered";
+  if (level.moon) return "💡 Tip: Early jumps · soft landings";
+  if (level.cloud) return "💡 Tip: Keep moving";
+  if (level.dark) return "💡 Tip: Find the switch fast";
+  if (level.volcano) return "💡 Tip: Keep rhythm over lava";
+  if (level.giantEnemies) return "💡 Tip: Give patrols room";
+  if (level.sirens?.length || level.toys?.length) return "💡 Tip: Grab the toy first";
+  if (level.boss) return "💡 Tip: Save bark for telegraphs";
+  return "💡 Tip: Path bones first";
 }
 
 function levelSelectFocusPill(level) {
@@ -1264,6 +1311,10 @@ function levelSelectLengthBadge(level) {
 }
 
 function runSummaryTheme(level = levelRuntime) {
+  if (level?.boss?.name) {
+    return { text: `Boss · ${level.boss.name}`, tone: "boss" };
+  }
+
   const labels = [];
   if (level?.water) labels.push("Swim");
   if (level?.moon) labels.push("Moon");
@@ -1364,7 +1415,7 @@ function renderLaunchStatus() {
   const previewGoal = levelSelectGoalPreview(level);
   const levelNumber = Math.max(1, Math.min(LEVELS.length, (state.currentLevelIndex || 0) + 1));
   const levelText = `Level ${levelNumber} of ${LEVELS.length}`;
-  const stageText = level?.boss?.name ? "♛ Boss arena" : `${levelSelectStageIcon(level)} ${levelSelectStageText(level)}`;
+  const stageText = `${levelSelectStageIcon(level)} ${level?.boss?.name ? `Boss · ${level.boss.name}` : levelSelectStageText(level)}`;
   const progress = Math.max(0, Math.min(100, (levelNumber / LEVELS.length) * 100));
   const statusText = `Press Start · ${levelText} · ${stageText} · ${previewGoal.text}`;
 
@@ -1377,6 +1428,64 @@ function renderLaunchStatus() {
     `Press Start to launch ${levelText}. ${level?.boss?.name ? `Boss stage featuring ${level.boss.name}.` : `Stage ${levelSelectStageText(level)}.`} ${previewGoal.label}.`
   );
   statusEl.title = `Preview start: ${Math.round(progress)}% into the 20-level run`;
+}
+
+function mobileSpecialActionMeta(level) {
+  if (level?.tunnel) {
+    return {
+      text: "DIG",
+      caption: "Hold to dig",
+      ariaLabel: "Hold to dig through dirt. Add BARK for faster digging.",
+      theme: "tunnel",
+    };
+  }
+  if (level?.water) {
+    return {
+      text: "DIVE",
+      caption: "Hold to dive",
+      ariaLabel: "Hold to dive downward through the water stage.",
+      theme: "water",
+    };
+  }
+  return {
+    text: "DIG",
+    caption: "Dig / dive",
+    ariaLabel: "Dig or dive",
+    theme: "default",
+  };
+}
+
+function renderMobileControlHints(level = levelRuntime) {
+  const meta = mobileSpecialActionMeta(level);
+  const launchState = state.mode === "start" || state.mode === "title";
+  const subtitleParts = [launchState ? "▲ start" : "▲ jump", "BARK attack"];
+
+  if (level?.tunnel) {
+    subtitleParts.push("DIG hold");
+  } else if (level?.water) {
+    subtitleParts.push("DIVE hold");
+  }
+  if (launchState) subtitleParts.push("HENRY portal");
+
+  if (digBtn) {
+    digBtn.textContent = meta.text;
+    digBtn.dataset.theme = meta.theme;
+    digBtn.setAttribute("aria-label", meta.ariaLabel);
+    digBtn.title = meta.ariaLabel;
+  }
+  if (mobileDigCaptionEl) {
+    mobileDigCaptionEl.textContent = meta.caption;
+    mobileDigCaptionEl.dataset.theme = meta.theme;
+  }
+  if (mobileControlsSubtitleEl) {
+    const subtitle = subtitleParts.join(" · ");
+    mobileControlsSubtitleEl.textContent = subtitle;
+    mobileControlsSubtitleEl.setAttribute(
+      "aria-label",
+      launchState ? `${subtitle}. Mobile title-screen controls.` : `${subtitle}. Mobile gameplay controls.`
+    );
+    mobileControlsSubtitleEl.title = subtitle;
+  }
 }
 
 function renderRunSummary(level = levelRuntime) {
@@ -1569,6 +1678,8 @@ function renderRunSummary(level = levelRuntime) {
   if (summaryTipEl) {
     summaryTipEl.textContent = levelSelectTipText(level);
   }
+
+  renderMobileControlHints(level);
 }
 
 function goToStartScreen() {
@@ -1689,7 +1800,7 @@ function renderHenryProgress() {
   }
   if (henryProgressTipEl) {
     const tipText = levelSelectTipText(level);
-    henryProgressTipEl.textContent = `💡 Tip: ${tipText.replace(/^Tip:\s*/, "")}`;
+    henryProgressTipEl.textContent = levelSelectPortalTipText(level);
     henryProgressTipEl.dataset.tone = "tip";
     henryProgressTipEl.dataset.theme = themeKey;
     henryProgressTipEl.setAttribute("aria-label", tipText);
@@ -2804,7 +2915,7 @@ function drawLevelPreviewCard(x, y, level) {
   ctx.fillStyle = "#eafcff";
   ctx.font = "bold 13px 'Roboto', system-ui";
   ctx.textAlign = "center";
-  ctx.fillText("▶ Press Enter, Space, W, ↑, or tap ▲ to start this level", x + width / 2, promptY + promptH / 2 + 1);
+  ctx.fillText("▶ Press Enter / Space / W / ↑ or tap ▲ to start this level", x + width / 2, promptY + promptH / 2 + 1);
   ctx.restore();
 }
 
@@ -4059,18 +4170,25 @@ function drawToyProjectile(p) {
 }
 
 function drawLightSwitch(light) {
-  const glow = light.on ? 0.55 + Math.sin(Date.now() * 0.01) * 0.1 : 0;
+  const pulse = 0.5 + Math.sin(Date.now() * 0.008) * 0.5;
+  const glow = light.on ? 0.55 + pulse * 0.1 : 0;
   if (light.on) {
     ctx.fillStyle = `rgba(255, 235, 150, ${glow})`;
     ctx.beginPath();
     ctx.arc(light.x + light.w / 2, light.y + light.h / 2, 44, 0, Math.PI * 2);
     ctx.fill();
+  } else {
+    ctx.strokeStyle = `rgba(255, 240, 170, ${0.22 + pulse * 0.12})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(light.x + light.w / 2, light.y + light.h / 2, 16 + pulse * 4, 0, Math.PI * 2);
+    ctx.stroke();
   }
 
   ctx.fillStyle = "#2e3642";
   roundedRect(light.x, light.y, light.w, light.h, 8);
   ctx.fill();
-  ctx.fillStyle = light.on ? "#ffe792" : "#7f8ca5";
+  ctx.fillStyle = light.on ? "#ffe792" : "#9caac4";
   roundedRect(light.x + 6, light.y + 8, light.w - 12, light.h - 16, 6);
   ctx.fill();
 }
@@ -4098,15 +4216,18 @@ function drawDarknessOverlay(level) {
   ctx.fill();
 
   for (const light of lights) {
-    if (!light.on) continue;
     const x = light.x + light.w / 2 - state.cameraX;
     const y = light.y + light.h / 2;
-    const glow = ctx.createRadialGradient(x, y, 12, x, y, 120);
-    glow.addColorStop(0, "rgba(255,255,255,0.95)");
-    glow.addColorStop(1, "rgba(255,255,255,0)");
+    const radius = light.on ? 120 : DARK_SWITCH_BEACON_RADIUS + Math.sin(Date.now() * 0.008) * 6;
+    const innerRadius = light.on ? 12 : 6;
+    const centerAlpha = light.on ? 0.95 : 0.58;
+    const edgeAlpha = light.on ? 0 : 0.06;
+    const glow = ctx.createRadialGradient(x, y, innerRadius, x, y, radius);
+    glow.addColorStop(0, `rgba(255,255,255,${centerAlpha})`);
+    glow.addColorStop(1, `rgba(255,255,255,${edgeAlpha})`);
     ctx.fillStyle = glow;
     ctx.beginPath();
-    ctx.arc(x, y, 120, 0, Math.PI * 2);
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -5132,7 +5253,7 @@ function drawOverlay() {
       border: "rgba(159, 229, 255, 0.34)",
       color: "#effaff",
     });
-    drawStartPromptCard(canvas.height / 2 + 166, "▶ Press Start", "Enter, Space, W, ↑, or tap ▲");
+    drawStartPromptCard(canvas.height / 2 + 166, "▶ Press Start", "Enter / Space / W / ↑ or tap ▲");
     ctx.textAlign = "start";
     return;
   }
@@ -5164,7 +5285,7 @@ function drawOverlay() {
         color: "#f4fbff",
       });
     }
-    drawStartPromptCard(canvas.height / 2 + 102, "▶ Press Start", "Enter, Space, W, ↑, or tap ▲");
+    drawStartPromptCard(canvas.height / 2 + 102, "▶ Press Start", "Enter / Space / W / ↑ or tap ▲");
     ctx.textAlign = "start";
     return;
   }
@@ -5448,15 +5569,30 @@ function render() {
 
   const barkBtn = document.getElementById("btn-bark");
   if (barkBtn) {
-    barkBtn.textContent = cooldownLeft > 0 ? `BARK ${Math.ceil(cooldownLeft / 1000)}` : "BARK";
-    barkBtn.classList.toggle("cooldown", cooldownLeft > 0);
+    const barkCoolingDown = cooldownLeft > 0;
+    barkBtn.textContent = barkCoolingDown ? `BARK ${Math.ceil(cooldownLeft / 1000)}` : "BARK";
+    barkBtn.classList.toggle("cooldown", barkCoolingDown);
+    barkBtn.setAttribute("aria-label", barkCoolingDown ? `Super bark recharging, ${Math.ceil(cooldownLeft / 1000)} seconds left` : "Super bark attack");
+    barkBtn.title = barkCoolingDown ? `Super bark recharging: ${Math.ceil(cooldownLeft / 1000)}s left` : "Super bark ready";
+    if (mobileBarkCaptionEl) {
+      mobileBarkCaptionEl.textContent = barkCoolingDown ? "Cooldown" : "Attack";
+    }
   }
 
   const pauseBtn = document.getElementById("btn-pause");
   if (pauseBtn) {
     const paused = state.mode === "paused";
-    pauseBtn.textContent = paused ? "RESUME" : "PAUSE";
+    const pauseAvailable = state.mode === "playing" || paused;
+    pauseBtn.textContent = paused ? "RESUME" : pauseAvailable ? "PAUSE" : "RUN FIRST";
     pauseBtn.classList.toggle("paused", paused);
+    pauseBtn.disabled = !pauseAvailable;
+    pauseBtn.dataset.state = paused ? "paused" : pauseAvailable ? "ready" : "locked";
+    const pauseLabel = paused ? "Resume run" : pauseAvailable ? "Pause run" : "Pause locked until a run starts";
+    pauseBtn.setAttribute("aria-label", pauseLabel);
+    pauseBtn.title = pauseLabel;
+    if (mobilePauseCaptionEl) {
+      mobilePauseCaptionEl.textContent = pauseAvailable ? "Pause / resume" : "Pause locked";
+    }
   }
 
   const previewLevel =
@@ -5478,7 +5614,7 @@ function render() {
 
     if (state.mode === "start") {
       label = `${previewStageIcon} Start Level ${previewLevelNumber}`;
-      hint = `Start from the title screen with a click or press Enter, Space, W, or ↑`;
+      hint = `Start from the title screen with a click or press Enter / Space / W / ↑`;
       aria = `Start Level ${previewLevelNumber} from the title screen with Enter, Space, W, or Arrow Up`;
       disabled = false;
       shortcut = "Enter / Space / W / ↑";
@@ -5490,7 +5626,7 @@ function render() {
       shortcut = "P / Esc";
     } else if (state.mode === "title") {
       label = `${previewStageIcon} Start Level ${previewLevelNumber}`;
-      hint = `Launch ${previewLevel.name} now with a click or press Enter, Space, W, or ↑`;
+      hint = `Launch ${previewLevel.name} now with a click or press Enter / Space / W / ↑`;
       aria = `Start ${previewLevel.name} now with Enter, Space, W, or Arrow Up`;
       disabled = false;
       shortcut = "Enter / Space / W / ↑";
@@ -5537,21 +5673,24 @@ function render() {
   if (pauseDesktopBtn) {
     const paused = state.mode === "paused";
     const pauseAvailable = state.mode === "playing" || paused;
-    pauseDesktopBtn.textContent = paused ? "Resume" : pauseAvailable ? "Pause" : "Run first";
+    pauseDesktopBtn.textContent = paused ? "Resume" : pauseAvailable ? "Pause" : "Pause locked";
     pauseDesktopBtn.dataset.shortcut = pauseAvailable ? "P / Esc" : "";
     pauseDesktopBtn.disabled = !pauseAvailable;
     pauseDesktopBtn.classList.toggle("paused", paused);
-    pauseDesktopBtn.setAttribute(
-      "aria-label",
-      paused ? "Resume game" : pauseAvailable ? "Pause game" : "Pause unavailable until the run starts"
-    );
+    const pauseLabel = paused
+      ? "Resume game"
+      : pauseAvailable
+        ? "Pause game"
+        : "Pause locked until the run starts";
+    pauseDesktopBtn.setAttribute("aria-label", pauseLabel);
+    pauseDesktopBtn.title = pauseLabel;
     const hintEl = pauseDesktopBtn.parentElement?.querySelector(".utility-btn-hint");
     if (hintEl) {
       hintEl.innerHTML = paused
         ? "Resume the run with a click or press <kbd>P</kbd> / <kbd>Esc</kbd>"
         : pauseAvailable
           ? "Stop or resume a run with a click or press <kbd>P</kbd> / <kbd>Esc</kbd>"
-          : "Pause becomes available once a run is in progress.";
+          : "Start a run to unlock pause and the <kbd>P</kbd> / <kbd>Esc</kbd> shortcut.";
     }
   }
 
@@ -6360,8 +6499,11 @@ if (fullscreenBtn) {
   const targetEl = canvas;
   const updateLabel = () => {
     const active = document.fullscreenElement === targetEl;
-    fullscreenBtn.textContent = active ? "⛶ Exit Fullscreen" : "⛶ Fullscreen";
-    fullscreenBtn.setAttribute("aria-label", active ? "Exit fullscreen" : "Enter fullscreen");
+    fullscreenBtn.textContent = active ? "⛶ Exit Fullscreen" : "⛶ Play Fullscreen";
+    fullscreenBtn.dataset.shortcut = active ? "Esc" : "";
+    const fullscreenLabel = active ? "Exit fullscreen" : "Enter fullscreen";
+    fullscreenBtn.setAttribute("aria-label", fullscreenLabel);
+    fullscreenBtn.title = active ? "Press Esc or click to exit fullscreen" : "Click to enter fullscreen";
     const hintEl = fullscreenBtn.parentElement?.querySelector(".utility-btn-hint");
     if (hintEl) {
       hintEl.innerHTML = active

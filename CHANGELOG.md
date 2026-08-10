@@ -1,5 +1,155 @@
 # Dachshund Dash Changelog
 
+## 2026-08-10
+### Daily improvement: mobile pause control now stays locked until a run starts
+- Updated the visible on-screen **Pause** control so the title screen no longer suggests pausing is available before gameplay begins: the button now shows **RUN FIRST**, stays disabled, and switches its caption to **Pause locked** until a live run starts.
+- Kept the change safe and local in `index.html`, `game.js`, and `styles.css` by only syncing the mobile pause button’s existing label, disabled state, and styling with the already-locked desktop pause action; gameplay, pause behavior, and controls did not change.
+- Verified with `node --check game.js`, `node --check tmp/verify-mobile-pause-locked.js`, and `node tmp/verify-mobile-pause-locked.js`, which confirmed the mobile button stays disabled as **RUN FIRST** on the title screen, switches to **PAUSE** during live play, and flips to **RESUME** while paused before capturing the screenshot.
+
+![Mobile controls panel showing the locked RUN FIRST pause button on the title screen](changelog/2026-08-10-mobile-pause-locked.png)
+
+### Daily improvement: mobile bark cooldown now reads clearly at a glance
+- Updated the visible on-screen **BARK** control so touch players no longer have to infer the countdown state from the button text alone: while Super Bark is recharging, the caption now flips from **Attack** to **Cooldown** and the button exposes matching ready/recharging accessibility text.
+- Kept the change safe and local in `index.html` and `game.js` by only syncing the existing mobile bark button label, caption, and tooltip text with the already-tracked cooldown timer; gameplay timing, damage, and controls did not change.
+- Verified with `node --check game.js`, `node --check tmp/verify-mobile-bark-cooldown-caption.js`, and `node tmp/verify-mobile-bark-cooldown-caption.js`, which confirmed the mobile bark control shows **Attack** when ready, switches to **BARK 2** plus **Cooldown** while recharging, and keeps its cooldown styling before capturing the screenshot.
+
+![Mobile controls panel showing the BARK cooldown caption during recharge](changelog/2026-08-10-mobile-bark-cooldown-caption.png)
+
+## 2026-08-09
+### Daily improvement: mobile controls subtitle now previews only the actions that matter
+- Tightened the visible **On-screen controls** subtitle so classic starts no longer carry the extra **DIG hold** hint, while tunnel and swim starts still swap in the real special action preview (**DIG hold** or **DIVE hold**) beside **▲ start**, **BARK attack**, and **HENRY portal**.
+- Kept the change safe and local in `index.html` and `game.js` by only updating the mobile-controls heading text and its existing stage-aware rendering; gameplay, inputs, and level data did not change.
+- Verified with `node --check game.js`, `node --check tmp/verify-mobile-controls-subtitle.js`, `node tmp/verify-mobile-controls-subtitle.js`, and `git diff --check -- index.html game.js tmp/verify-mobile-controls-subtitle.js CHANGELOG.md`, which confirmed the subtitle stays compact on Level 1 while correctly switching to **DIG hold** on Level 9 and **DIVE hold** on Level 3 before capturing the screenshot.
+
+![Mobile controls panel showing the tighter stage-aware subtitle](changelog/2026-08-09-mobile-controls-subtitle.png)
+
+### Daily improvement: start shortcut copy now reads the same across title-screen helpers
+- Standardized the visible **Start** shortcut copy in the title-screen helpers so the action card hint, shortcut badge, and control chip all now read **Enter / Space / W / ↑** in the same order.
+- Kept the change safe and local in `index.html` and `game.js` by only updating launch helper text; gameplay, controls, and level logic did not change.
+- Verified with `node --check game.js`, `node --check tmp/verify-start-shortcut-copy.js`, `node tmp/verify-start-shortcut-copy.js`, and `git diff --check -- index.html game.js tmp/verify-start-shortcut-copy.js CHANGELOG.md`, which confirmed the visible helper surfaces now match before capturing the screenshot.
+
+![Title-screen controls help showing the consistent Start shortcut copy](changelog/2026-08-09-start-shortcut-copy.png)
+
+## 2026-08-08
+### Daily improvement: fullscreen action now names the real play state
+- Clarified the title-screen fullscreen control so it now says **Play Fullscreen** before launch, then flips to **Exit Fullscreen** with a visible **Esc** shortcut badge once fullscreen is active.
+- Kept the change safe and local in `game.js` by only updating the existing fullscreen button label, tooltip, and shortcut metadata; gameplay, controls, and level data did not change.
+- Verified with `node --check game.js`, `node tmp/verify-fullscreen-esc-shortcut.js`, and `git diff --check -- game.js tmp/verify-fullscreen-esc-shortcut.js CHANGELOG.md`, which confirmed the default title-screen label, the active `Esc` badge in fullscreen, and the canvas entering fullscreen before capturing the screenshot.
+
+![Title-screen actions panel showing the clearer Play Fullscreen control](changelog/2026-08-08-fullscreen-esc-shortcut.png)
+
+### Daily improvement: title-screen pause action now says when it is locked
+- Renamed the disabled title-screen pause card from **Run first** to **Pause locked** so the state reads as unavailable instead of sounding like a separate action, and clarified the helper copy to explain that starting a run unlocks pause plus the `P` / `Esc` shortcut.
+- Kept the change safe and local in `game.js` by only updating the existing title-screen pause button label, tooltip, and helper text; gameplay, pause behavior, controls, and level data did not change.
+- Verified with `node --check game.js`, `node tmp/verify-pause-locked-label.js`, and `git diff --check -- game.js tmp/verify-pause-locked-label.js CHANGELOG.md`, which confirmed the button stays disabled before a run starts while now showing **Pause locked** with the updated tooltip/helper copy, then captured the screenshot.
+
+![Title-screen actions panel showing the disabled Pause locked button](changelog/2026-08-08-pause-locked-title-card.png)
+
+## 2026-08-07
+### Daily improvement: clearer title-screen pause card before a run starts
+- Retuned the disabled **Run first** pause action card on the title screen so it keeps a readable purple pause tint instead of fading into the background, while still staying clearly non-interactive until gameplay begins.
+- Kept the change safe and local in `styles.css` by only adjusting the disabled styling for the existing pause utility button; no gameplay logic, controls, or level data changed.
+- Verified with a small Playwright check that the title-screen pause button still renders as disabled with the same **Run first** copy and helper hint, now using the new gradient styling, then ran `git diff --check -- styles.css CHANGELOG.md` and captured the screenshot.
+
+![Title-screen utility actions with the clearer disabled Run first pause card](changelog/2026-08-07-pause-disabled-card.png)
+
+### Daily improvement: water-stage mobile controls now preview the real dive action
+- Updated the visible mobile special-action preview for swim stages so the button now switches to **DIVE** with a clearer **Hold to dive** caption before launch, matching the downward water-stage action more directly than the older generic dive/descend wording.
+- Kept the change safe and local in `game.js` by refining the existing stage-aware mobile control metadata only; no gameplay physics, level layouts, or input bindings changed.
+- Verified with `node --check game.js`, `node tmp/verify-water-dive-preview.js`, and `git diff --check -- game.js CHANGELOG.md`, which confirmed the default button still reads **DIG / Dig / dive**, while the Level 3 water preview flips to **DIVE / Hold to dive** with the water theme and captured the screenshot.
+
+![Mobile controls panel showing the water-stage DIVE preview](changelog/2026-08-07-mobile-water-dive-preview.png)
+
+## 2026-08-06
+### Daily improvement: quick keyboard tips now include a dedicated Start shortcut chip
+- Added a visible **Start** chip to the title-screen keyboard tips row so first-run launch controls are obvious at a glance: `Enter / W / ↑ / Space` now appears alongside move, jump, bark, pause, restart, and mute.
+- Kept the change safe and local in `index.html` and `styles.css` by extending the existing control-chip row and giving the new start hint a compact green highlight that matches the game’s launch affordances.
+- Verified with `node --check tmp/verify-start-shortcut-chip.js` and `node tmp/verify-start-shortcut-chip.js`, which confirmed the new **Start Enter / W / ↑ / Space** chip renders in the controls row with the intended emphasis styling and captured the screenshot.
+
+![Title-screen quick keyboard tips showing the new Start shortcut chip](changelog/2026-08-06-start-shortcut-chip.png)
+
+### Daily improvement: quick keyboard tips now include a dedicated Pause shortcut chip
+- Added a visible **Pause** chip to the title-screen keyboard tips row so the `P` / `Esc` shortcut is discoverable alongside move, jump, bark, restart, and mute.
+- Kept the change safe and local in `index.html` and `styles.css` by extending the existing control-chip list and giving the new pause hint a subtle warm highlight for faster scanning.
+- Verified with `node --check tmp/verify-pause-shortcut-chip.js` and `node tmp/verify-pause-shortcut-chip.js`, which confirmed the new **Pause P / Esc** chip renders in the controls row with its emphasis styling and captured the screenshot.
+
+![Title-screen quick keyboard tips showing the new Pause shortcut chip](changelog/2026-08-06-pause-shortcut-chip.png)
+
+## 2026-08-05
+### Daily improvement: dark-stage light switches now glow through the blackout
+- Added a subtle beacon treatment to unlit dark-stage switches so they stay findable in the blackout: each switch now has a soft pulse ring plus a faint light pocket in the darkness before you touch it.
+- Kept the change safe and local in `game.js`, only adjusting dark-stage switch rendering and blackout overlay visibility without changing level layouts, timers, or switch behavior.
+- Verified with `node --check game.js` and `node tmp/verify-dark-switch-beacon.js`, which loaded Level 7 in a headless browser, confirmed the switch center renders materially brighter than nearby blackout pixels, and captured the screenshot.
+
+![Level 7 blackout with the first light switch emitting a subtle beacon glow](changelog/2026-08-05-dark-switch-beacon.png)
+
+### Daily improvement: the HENRY cheat hint now shows the full key sequence at a glance
+- Updated the visible **Secret** callout on the title screen so **henry** now appears as five distinct keyboard-style chips (**H E N R Y**), making the hidden portal code easier to spot and remember without changing how the cheat works.
+- Kept the change safe and local in `index.html` and `styles.css`, only restructuring the existing hint text and adding light styling for the grouped key sequence.
+- Verified with `git diff --check -- index.html styles.css CHANGELOG.md` and a small HTML check confirming the new `secret-code-sequence` renders five letter chips, then captured the screenshot.
+
+![Title-screen secret hint showing the H E N R Y code as individual key chips](changelog/2026-08-05-secret-code-sequence.png)
+
+## 2026-08-04
+### Daily improvement: siren-stage previews now show the toy objective
+- Updated the visible siren-stage goal previews so the title status pill, **Start run** context pill, and run-summary goal pill now call out the shutdown pickup with **🧸 Toy** instead of only showing bones plus flag.
+- Kept the change safe and local in `game.js` by extending the existing goal-preview formatting for siren/toy stages, while preserving the fuller accessible copy with the descriptive objective text (`toy toss`).
+- Verified with `node --check game.js` and `node tmp/verify-toy-goal-preview.js`, which forced the first siren/toy stage preview (Level 5), confirmed the new toy goal appears in all three visible surfaces, and captured the screenshot.
+
+![Siren-stage start preview showing the new toy objective in the goal pills](changelog/2026-08-04-toy-goal-preview.png)
+
+### Daily improvement: lights-stage previews now show the switch objective
+- Updated the visible lights-stage goal previews so the title status pill, **Start run** context pill, and run-summary goal pill now call out the blackout mechanic with **💡 Switch** instead of only showing bones plus flag.
+- Kept the change safe and local in `game.js` by extending the existing goal-preview formatting for dark stages, while preserving the fuller accessible copy with the real switch count (`3 light switches`).
+- Verified with `node --check game.js` and `node tmp/verify-lights-goal-preview.js`, which forced the Level 7 lights preview, confirmed the new switch goal appears in all three visible surfaces, and captured the screenshot.
+
+![Lights-stage start preview showing the new switch objective in the goal pills](changelog/2026-08-04-lights-goal-preview.png)
+
+## 2026-08-03
+### Daily improvement: boss stages now name the actual boss in visible stage pills
+- Updated the visible launch/status pill and run-summary stage pill so boss checkpoints now show the real boss name — for example **♛ Boss · Corgi Captain** — instead of falling back to a generic boss arena or classic-stage label.
+- Kept the change safe and local in `game.js` by reusing the existing boss metadata already used elsewhere in the launch UI, without touching gameplay, inputs, or level data.
+- Verified with `node --check game.js` and `node tmp/verify-boss-name-preview.js`, which forced a Level 10 title preview, confirmed both visible pills include **Corgi Captain**, and captured the screenshot.
+
+![Boss-start preview showing the real boss name in the visible launch and stage pills](changelog/2026-08-03-boss-name-preview.png)
+
+### Daily improvement: title-screen Start button now stands out at a glance
+- Brightened the visible **Start Level** button on the title screen with a stronger filled gradient, clearer shortcut chip contrast, and a gentle lift/halo so the primary action reads immediately against the darker utility controls.
+- Kept the change safe and local in `styles.css` by only tuning the existing `.utility-btn-start` presentation, without touching gameplay, controls, or level logic.
+- Verified with `git diff --check` and a fresh headless Chrome render of the title screen, then captured the screenshot.
+
+![Brighter title-screen Start button with stronger contrast and glow](changelog/2026-08-03-start-button-prominence.png)
+
+## 2026-08-02
+### Daily improvement: HENRY portal now sits on a calmer blurred backdrop
+- Added a stronger dark glass backdrop behind the **HENRY** level portal so the level cards separate more clearly from the busy title screen art without changing gameplay or portal behavior.
+- Kept the change safe and local in `styles.css` by moving the overlay treatment into a dedicated `#level-select::before` layer, which preserves the existing background image while adding the new blur.
+- Verified with `node tmp/verify-henry-overlay-backdrop.js`, which opened the portal, confirmed the overlay pseudo-element renders the new radial backdrop plus `blur(7px) saturate(1.08)`, and captured the screenshot.
+
+![HENRY level portal with the calmer blurred backdrop behind it](changelog/2026-08-02-henry-overlay-backdrop.png)
+
+### Daily improvement: HENRY portal now fits shorter screens cleanly
+- Made the **HENRY** level portal card fit short laptop-height screens by constraining it to the viewport, letting the level grid scroll inside the card, and keeping the **Close · Esc** button pinned at the bottom while browsing all 20 levels.
+- Kept the change safe and local in `styles.css`, preserving the existing portal layout and visuals while improving overflow behavior for the existing overlay.
+- Verified with `node tmp/verify-henry-portal-scroll-fit.js`, which opened the portal in a short 1280×760 viewport, confirmed the card stays within the viewport, scrolls internally, keeps `overflow-y: auto`, and leaves the sticky close button visible after scrolling.
+
+![HENRY level portal fitting a shorter viewport with a sticky close button](changelog/2026-08-02-henry-portal-scroll-fit.png)
+
+## 2026-08-01
+### Daily improvement: HENRY portal tip pill now stays short and scannable
+- Shortened the visible **HENRY portal** tip pill into a compact action-first hint — for example **💡 Tip: ↓ Dig · BARK fast** on the tunnel stage — so the portal keeps its guidance without adding another long sentence to the screen.
+- Kept the change safe and local by adding a dedicated compact portal-tip formatter in `game.js`, while preserving the existing full descriptive tooltip and accessibility label for the same pill.
+- Verified with `node --check game.js` and `node tmp/verify-henry-progress-short-tip.js`, which forced the **Level 9** tunnel preview, confirmed `#henry-progress-tip` renders the new short text with the original full accessible label/title, and captured the screenshot.
+
+![HENRY portal progress summary showing the new short tunnel tip pill](changelog/2026-08-01-henry-progress-short-tip.png)
+
+### Daily improvement: mobile special-action button now previews tunnel digging
+- Made the visible **DIG** mobile control smarter on stage previews: tunnel starts now keep the **DIG** label but switch its caption to **Hold to dig** with a matching tunnel tint, so mobile players get the real Level 9 action at a glance before launching.
+- Kept the change safe and local by driving the mobile special-action button from existing stage metadata in `game.js`, only retinting the existing control in `styles.css`, and leaving gameplay inputs unchanged.
+- Verified with `node --check game.js` and `node tmp/verify-mobile-dig-preview.js`, which confirmed the default **DIG / Dig / dive** state, then forced the **Level 9** tunnel preview and verified the button keeps **DIG** while the caption flips to **Hold to dig** with the tunnel accessibility copy and screenshot.
+
+![Mobile controls panel showing the tunnel-stage DIG preview hint](changelog/2026-08-01-mobile-dig-preview.png)
+
 ## 2026-07-31
 ### Daily improvement: muted audio now keeps the queued soundtrack visible
 - Updated the visible **Audio** utility button so muting no longer collapses to a generic off label — it now keeps the selected soundtrack name visible, for example **🔇 Boss mix**, which makes queued special-stage music easier to confirm at a glance.
