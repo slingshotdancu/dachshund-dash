@@ -1275,6 +1275,26 @@ body.mobile-device.mobile-motion-prompt .mobile-immersive-overlay {
   color: #ffd29e;
 }
 
+#control-chip-special[data-theme="water"] {
+  border-color: rgba(123, 216, 255, 0.34);
+  background: linear-gradient(180deg, rgba(19, 55, 82, 0.92), rgba(12, 35, 54, 0.84));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 16px rgba(64, 163, 255, 0.12);
+}
+
+#control-chip-special[data-theme="water"] .control-chip-label {
+  color: #9de7ff;
+}
+
+#control-chip-special[data-theme="tunnel"] {
+  border-color: rgba(255, 203, 121, 0.34);
+  background: linear-gradient(180deg, rgba(74, 50, 20, 0.92), rgba(48, 31, 13, 0.84));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 16px rgba(255, 177, 66, 0.12);
+}
+
+#control-chip-special[data-theme="tunnel"] .control-chip-label {
+  color: #ffd79d;
+}
+
 .utility-actions {
   display: inline-flex;
   flex-direction: column;
@@ -1715,6 +1735,15 @@ body.mobile-device.mobile-motion-prompt .mobile-immersive-overlay {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+
   .utility-btn-start:not(:disabled) {
     animation: none;
     transform: none;

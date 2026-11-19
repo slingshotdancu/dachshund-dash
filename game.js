@@ -22,6 +22,9 @@ const mobileControlsSubtitleEl = document.getElementById("mobile-controls-subtit
 const mobileBarkCaptionEl = document.getElementById("mobile-control-caption-bark");
 const mobileDigCaptionEl = document.getElementById("mobile-control-caption-dig");
 const mobilePauseCaptionEl = document.getElementById("mobile-control-caption-pause");
+const specialActionChipEl = document.getElementById("control-chip-special");
+const specialActionChipLabelEl = document.getElementById("control-chip-special-label");
+const specialActionChipTextEl = document.getElementById("control-chip-special-text");
 const recoveryShortcutCalloutEl = document.getElementById("recovery-shortcut-callout");
 const summaryLevelEl = document.getElementById("summary-level");
 const summaryThemeEl = document.getElementById("summary-theme");
@@ -64,6 +67,10 @@ const MOON_LEVEL_MUSIC = "assets/moonlevel.wav";
 const CLOUD_LEVEL_MUSIC = "assets/newlevel.wav";
 const GIANT_LEVEL_MUSIC = "assets/giantlevel.wav";
 const LIGHTS_LEVEL_MUSIC = "assets/lightslevel.wav";
+const TUNNEL_ENEMY_BLUEPRINTS = [
+  { kind: "mole", w: 42, h: 28 },
+  { kind: "mouse", w: 34, h: 24 },
+];
 const LOGO_IMG = "assets/henry/middle.jpg";
 
 function levelMusicProfile(level) {
@@ -259,6 +266,26 @@ function buildLavaPools(platforms, worldWidth) {
 
   if (lavaWidth < 80) return [];
   return [{ x: lavaStart, y: LAVA_TOP_Y, w: lavaWidth, h: LAVA_HEIGHT }];
+}
+
+function remapPatrolToTunnelEnemy(enemy, index = 0) {
+  const blueprint = TUNNEL_ENEMY_BLUEPRINTS[index % TUNNEL_ENEMY_BLUEPRINTS.length];
+  const originalW = enemy.w ?? blueprint.w;
+  const originalH = enemy.h ?? blueprint.h;
+  return {
+    ...enemy,
+    kind: blueprint.kind,
+    w: blueprint.w,
+    h: blueprint.h,
+    y: enemy.y + (originalH - blueprint.h),
+  };
+}
+
+function applyTunnelEnemySwap(levels) {
+  levels.forEach((level) => {
+    if (!Array.isArray(level?.enemies)) return;
+    level.enemies = level.enemies.map((enemy, index) => remapPatrolToTunnelEnemy(enemy, index));
+  });
 }
 
 function makeLevelTemplate(levelNum) {
@@ -598,6 +625,8 @@ if (LEVELS[8]) {
   LEVELS[8].tunnelEntrance = { x: 330, y: 500, w: 140, h: 40, burstY: 470 };
   LEVELS[8].boss = null;
 }
+
+applyTunnelEnemySwap(LEVELS);
 
 const mobileControlState = {
   enabled: false,
@@ -1455,6 +1484,42 @@ function mobileSpecialActionMeta(level) {
   };
 }
 
+function desktopSpecialActionMeta(level) {
+  if (level?.tunnel) {
+    return {
+      label: "Dig",
+      text: "Hold ↓ · BARK boost",
+      ariaLabel: "Dig controls: hold down to dig through dirt, then add bark to chew faster.",
+      theme: "tunnel",
+    };
+  }
+  if (level?.water) {
+    return {
+      label: "Dive",
+      text: "S / ↓ hold underwater",
+      ariaLabel: "Dive controls: hold S or down arrow to dive underwater.",
+      theme: "water",
+    };
+  }
+  return {
+    label: "Dive",
+    text: "S / ↓ while flying",
+    ariaLabel: "Dive controls: press S or down arrow while flying.",
+    theme: "default",
+  };
+}
+
+function renderDesktopSpecialActionChip(level = levelRuntime) {
+  if (!specialActionChipEl || !specialActionChipLabelEl || !specialActionChipTextEl) return;
+
+  const meta = desktopSpecialActionMeta(level);
+  specialActionChipLabelEl.textContent = meta.label;
+  specialActionChipTextEl.textContent = meta.text;
+  specialActionChipEl.dataset.theme = meta.theme;
+  specialActionChipEl.setAttribute("aria-label", meta.ariaLabel);
+  specialActionChipEl.title = meta.ariaLabel;
+}
+
 function renderMobileControlHints(level = levelRuntime) {
   const meta = mobileSpecialActionMeta(level);
   const launchState = state.mode === "start" || state.mode === "title";
@@ -1679,6 +1744,7 @@ function renderRunSummary(level = levelRuntime) {
     summaryTipEl.textContent = levelSelectTipText(level);
   }
 
+  renderDesktopSpecialActionChip(level);
   renderMobileControlHints(level);
 }
 
@@ -2740,7 +2806,7 @@ function levelPreviewRows(level) {
   if (level.capes?.length) pickups.push("super cape");
   if (level.sirens?.length) pickups.push("toy toss");
 
-  const threats = ["spikes", "corgi patrols"];
+  const threats = ["spikes", "giant corgi patrols"];
   if (level.tunnel) threats.push("dirt walls");
   if (level.sirens?.length) threats.push("siren slowdown");
   if (level.boss) threats.push(level.boss.name);

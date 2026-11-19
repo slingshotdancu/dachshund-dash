@@ -1,5 +1,28 @@
 # Dachshund Dash Changelog
 
+## 2026-11-19
+### Daily improvement: reduced-motion preference now covers every animated effect
+- Extended the existing reduced-motion support from the Start button to all CSS animations, transitions, and smooth scrolling, so players who request less motion no longer see persistent pulses or decorative character animations.
+- Kept the change local to `styles.css`; normal-motion behavior is unchanged.
+- Verified in headless Chrome with `--force-prefers-reduced-motion`: the preference matched, a decorative animation and button transition both resolved to `0.01ms` / one iteration, and the check passed. Captured the title screen with reduced motion enabled.
+
+![Dachshund Dash title screen captured with reduced-motion preference enabled](changelog/2026-11-19-reduced-motion.png)
+
+## 2026-08-11
+### Daily improvement: giant-stage previews consistently say Big Corgis again
+- Restored Daniel’s established **Big Corgis** naming across the visible giant stage surfaces so the run summary, stage-tip label, title overlay tag row, hidden portal badges, and preview threat copy no longer drift into the incorrect **Big Burrowers** wording.
+- Kept the change safe and local in `game.js` by only correcting presentation text for giant-enemy stages; gameplay, collisions, enemy behavior, level layouts, and music did not change.
+- Verified with `node --check game.js`, `node --check tmp/verify-giant-stage-name.js`, `git diff --check -- game.js tmp/verify-giant-stage-name.js`, and `node tmp/verify-giant-stage-name.js`, which confirmed the giant stage renders **Stage Big Corgis** / **Big Corgis tip** and no longer exposes **Big Burrowers** before capturing the screenshot.
+
+![Run summary showing the restored Big Corgis giant-stage naming](changelog/2026-08-11-big-corgis-preview.png)
+
+### Daily improvement: desktop special-action tip now previews the selected stage move
+- Updated the visible keyboard tip row so the special-action chip no longer stays on a generic **Dive** hint for every start: tunnel previews now switch the chip to **Dig · Hold ↓ · BARK boost**, water starts show **Dive · S / ↓ hold underwater**, and classic starts keep the original flying dive hint.
+- Kept the change safe and local in `index.html`, `game.js`, and `styles.css` by reusing the existing stage preview metadata to retitle and retint one controls-help chip only; gameplay, input bindings, and level data did not change.
+- Verified with `node --check game.js`, `node --check tmp/verify-desktop-special-action-chip.js`, `git diff --check -- index.html game.js styles.css tmp/verify-desktop-special-action-chip.js`, and `node tmp/verify-desktop-special-action-chip.js`, which confirmed the chip stays **Dive** on Level 1, flips to **Dig · Hold ↓ · BARK boost** on Level 9, switches to the water-themed dive copy on Level 3, and captured the screenshot.
+
+![Keyboard tips row showing the new tunnel-specific Dig control chip](changelog/2026-08-11-desktop-special-action-chip.png)
+
 ## 2026-08-10
 ### Daily improvement: mobile pause control now stays locked until a run starts
 - Updated the visible on-screen **Pause** control so the title screen no longer suggests pausing is available before gameplay begins: the button now shows **RUN FIRST**, stays disabled, and switches its caption to **Pause locked** until a live run starts.

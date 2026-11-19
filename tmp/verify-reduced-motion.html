@@ -1,0 +1,14 @@
+<!doctype html>
+<link rel="stylesheet" href="../styles.css">
+<button class="utility-btn-start" data-state="start">Start</button>
+<span class="dax-tail"></span>
+<output id="result">PENDING</output>
+<script>
+const button = document.querySelector('.utility-btn-start');
+const tail = document.querySelector('.dax-tail');
+const transition = getComputedStyle(button).transitionDuration;
+const animation = getComputedStyle(tail);
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const pass = reduced && parseFloat(transition) <= 0.00001 && parseFloat(animation.animationDuration) <= 0.00001 && animation.animationIterationCount === '1';
+document.querySelector('#result').textContent = `REDUCED=${reduced}; TRANSITION=${transition}; ANIMATION=${animation.animationDuration}×${animation.animationIterationCount}; PASS=${pass}`;
+</script>
