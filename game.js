@@ -4806,16 +4806,23 @@ function drawBossProjectile(p) {
   ctx.fillRect(p.x + 3, p.y + 3, p.w - 6, p.h - 6);
 }
 
-function drawSleepwearPatch(x, y, w, h) {
+function drawSleepwearPatch(x, y, w, h, stripeDirection = "vertical") {
   ctx.save();
   ctx.beginPath();
   ctx.rect(x, y, w, h);
   ctx.clip();
   ctx.fillStyle = "#172947";
   ctx.fillRect(x, y, w, h);
-  for (let stripeX = x + 3; stripeX < x + w; stripeX += 8) {
-    ctx.fillStyle = Math.floor((stripeX - x) / 8) % 2 === 0 ? "#f3f4ed" : "#77a8e7";
-    ctx.fillRect(stripeX, y, 2.5, h);
+  if (stripeDirection === "horizontal") {
+    for (let stripeY = y + 2; stripeY < y + h; stripeY += 6) {
+      ctx.fillStyle = Math.floor((stripeY - y) / 6) % 2 === 0 ? "#f3f4ed" : "#77a8e7";
+      ctx.fillRect(x, stripeY, w, 2.5);
+    }
+  } else {
+    for (let stripeX = x + 3; stripeX < x + w; stripeX += 8) {
+      ctx.fillStyle = Math.floor((stripeX - x) / 8) % 2 === 0 ? "#f3f4ed" : "#77a8e7";
+      ctx.fillRect(stripeX, y, 2.5, h);
+    }
   }
   ctx.restore();
   ctx.strokeStyle = "rgba(220, 232, 255, 0.82)";
@@ -4938,7 +4945,7 @@ function drawDachshund(dog) {
     ctx.fillRect(bx + 32, by + 6, 1, 1);
 
     if (levelRuntime.id === 11) {
-      drawSleepwearPatch(bx + 15, by + 16, 24, 34);
+      drawSleepwearPatch(bx + 15, by + 16, 24, 34, "horizontal");
       drawSleepwearPatch(bx + 16, by + 49, 7, 17);
       drawSleepwearPatch(bx + 31, by + 49, 7, 17);
       drawNightCap(bx + 16, by - 1, -1);
@@ -5050,7 +5057,7 @@ function drawDachshund(dog) {
   }
 
   if (levelRuntime.id === 11) {
-    drawSleepwearPatch(x + 2, renderY + 8, 55, 20);
+    drawSleepwearPatch(x + 2, renderY + 8, 55, 20, "horizontal");
     for (const legX of [x + 9, x + 25, x + 39]) {
       drawSleepwearPatch(legX, renderY + 27, 8, 9);
     }

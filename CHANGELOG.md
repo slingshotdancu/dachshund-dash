@@ -2,7 +2,7 @@
 
 ## 2026-11-22
 ### Level 11 Henry gets striped sleepwear
-- Added white-and-blue striped pajamas and a matching nightcap to Henry, drawn only on Level 11 (including his alternate pose).
+- Added white-and-blue striped pajamas and a matching nightcap to Henry, drawn only on Level 11 (including his alternate pose). Changed the pajama body stripes to horizontal; the hat is unchanged.
 
 ### Level 12 gets calmer gaps and a fuller leaf gust
 - Spaced Level 12 gusts to every 16 seconds, shortened each gust to 3 seconds, and softened the backward push. Added persistent ground leaves and a denser upward-swirling burst when wind arrives.
