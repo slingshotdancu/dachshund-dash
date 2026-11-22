@@ -1466,11 +1466,17 @@ body.mobile-device.mobile-motion-prompt .mobile-immersive-overlay {
 }
 
 .utility-btn-hint {
+  display: none;
   font-size: 0.79rem;
   line-height: 1.4;
   color: rgba(240, 252, 255, 0.94);
   text-wrap: pretty;
   max-width: 26ch;
+}
+
+.utility-action-group:hover .utility-btn-hint,
+.utility-action-group:focus-within .utility-btn-hint {
+  display: block;
 }
 
 .utility-btn {

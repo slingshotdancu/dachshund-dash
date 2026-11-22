@@ -1557,10 +1557,13 @@ function renderRunSummary(level = levelRuntime) {
   const summarySection = summaryLevelEl?.parentElement;
   const hudSection = statusEl?.parentElement;
   const stageTipSection = summaryTipEl?.parentElement;
-  const hideSummary = false;
+  const hideSummary = state.mode === "start";
   const hideHud = state.mode === "start";
   const showStageTip = state.mode === "start" || state.mode === "title";
-  if (summarySection) summarySection.style.display = hideSummary ? "none" : "flex";
+  if (summarySection) {
+    summarySection.style.display = hideSummary ? "none" : "flex";
+    summarySection.setAttribute("aria-hidden", hideSummary ? "true" : "false");
+  }
   if (hudSection) hudSection.style.display = hideHud ? "none" : "flex";
   if (stageTipSection) {
     stageTipSection.style.display = showStageTip ? "flex" : "none";
