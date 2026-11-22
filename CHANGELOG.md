@@ -1,6 +1,15 @@
 # Dachshund Dash Changelog
 
 ## 2026-11-22
+### Level 15 becomes a circus
+- Added a big-top backdrop with striped canopy, spotlights, and seals on pedestals (some balancing balls).
+- Added two flaming hoops: jump through the opening while airborne; touching the ring costs a life.
+- Added a ball station: step on it to get the ball on your nose. Bark tosses it up; hold Up on the ground while standing still to balance it. A 3-2-1 countdown runs while you hold Up, and releasing Up resets it.
+- A previously locked gate opens when the countdown reaches 0, leading to the finish flag.
+- Verified in headless Chrome: gate blocks until opened, toss-and-catch works, holding Up balances without jumping, release resets, hoop hits and clean passes behave correctly.
+
+![Level 15 circus: tent, seals, balance countdown, and locked gate](changelog/2026-11-22-circus-level-15.png)
+
 ### Level 11 Henry gets striped sleepwear
 - Added white-and-blue striped pajamas and a matching nightcap to Henry, drawn only on Level 11 (including his alternate pose). Changed the pajama body stripes to horizontal; the hat is unchanged.
 

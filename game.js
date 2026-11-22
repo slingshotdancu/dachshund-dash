@@ -642,6 +642,28 @@ if (LEVELS[8]) {
   LEVELS[8].boss = null;
 }
 
+// Level 15: circus. Flame hoops, a ball-on-nose balance, then a locked gate.
+if (LEVELS[14]) {
+  const L = LEVELS[14];
+  L.circus = true;
+  L.worldWidth = 3400;
+  L.totalBones = 8;
+  L.platforms = [{ x: 0, y: 500, w: 3400, h: 40 }];
+  L.spikes = [];
+  L.enemies = [];
+  L.lavaPools = [];
+  L.hearts = [];
+  L.capes = [];
+  L.sirens = [];
+  L.toys = [];
+  L.boss = null;
+  L.bones = [300, 600, 1000, 1180, 1700, 2180, 2620, 2950].map((x) => ({ x, y: 458, r: 11 }));
+  L.flameHoops = [{ x: 820, y: 400, r: 62 }, { x: 1360, y: 400, r: 62 }];
+  L.ballStation = { x: 1960, y: 470, w: 90, h: 30 };
+  L.lockedGate = { x: 2420, y: 140, w: 22, h: 360 };
+  L.finishFlag = { x: 3280, y: 360, w: 16, h: 140 };
+}
+
 applyTunnelEnemySwap(LEVELS);
 
 const mobileControlState = {
@@ -2641,6 +2663,7 @@ function spawnBarkWave(mode = "forward") {
 function triggerBark() {
   // Normal bark: short range, no cooldown, two-hit kill on enemies.
   if (state.mode !== "playing") return;
+  if (circusTossBall()) return;
   state.combat.barkWaves.push({
     x: state.dog.facing > 0 ? state.dog.x + state.dog.w - 6 : state.dog.x - 60,
     y: state.dog.y + 6,
@@ -2655,6 +2678,7 @@ function triggerBark() {
 }
 
 function triggerSuperBark() {
+  if (circusTossBall()) return;
   if (triggerTunnelDigBoost()) return;
   if (state.mode !== "playing" || !barkReady()) return;
 
@@ -2747,12 +2771,17 @@ function hydrateLevelRuntime(level) {
     windNextAt: 0,
     windGustUntil: 0,
     stormStartedAt: 0,
+    circusBall: level.circus ? { phase: "station", x: 0, y: 0, vy: 0, balanceMs: 0, lastAt: 0 } : null,
+    flameHoops: (level.flameHoops || []).map((h) => ({ ...h })),
+    ballStation: level.ballStation ? { ...level.ballStation } : null,
+    lockedGate: level.lockedGate ? { ...level.lockedGate, open: false, openedAt: 0 } : null,
   };
 }
 
 let levelRuntime = hydrateLevelRuntime(LEVELS[0]);
 
 function resetPlayerPosition() {
+  resetCircusBall(levelRuntime);
   state.dog.x = START_X;
   state.dog.y = START_Y;
   state.dog.vx = 0;
@@ -3307,6 +3336,326 @@ function updateWindGustCycle(level, now) {
   return now < level.windGustUntil;
 }
 
+// ---- Level 15: circus ----
+const CIRCUS_BALANCE_MS = 3000;
+const CIRCUS_BALL_R = 8;
+const CIRCUS_TOSS_VY = -11;
+const CIRCUS_BALL_GRAVITY = 0.5;
+
+function circusNosePoint(dog = state.dog) {
+  return { x: dog.facing > 0 ? dog.x + dog.w - 12 : dog.x + 12, y: dog.y - CIRCUS_BALL_R + 4 };
+}
+
+function resetCircusBall(level) {
+  if (!level?.circusBall || level.circusBall.phase === "done") return;
+  level.circusBall.phase = "station";
+  level.circusBall.balanceMs = 0;
+  level.circusBall.vy = 0;
+}
+
+// Bark while the ball rests on the nose throws it upward.
+function circusTossBall() {
+  const level = levelRuntime;
+  const cb = level?.circusBall;
+  if (!level?.circus || !cb || cb.phase !== "held" || state.mode !== "playing") return false;
+  const nose = circusNosePoint();
+  cb.phase = "tossed";
+  cb.x = nose.x;
+  cb.y = nose.y;
+  cb.vy = CIRCUS_TOSS_VY;
+  playSuperBarkSound();
+  return true;
+}
+
+function updateCircus(level, now) {
+  const cb = level?.circusBall;
+  if (!level?.circus || !cb) return;
+  const dog = state.dog;
+  const dt = Math.min(64, now - (cb.lastAt || now));
+  cb.lastAt = now;
+  const frames = dt / 16.67;
+  const nose = circusNosePoint(dog);
+  const restY = nose.y;
+
+  if (cb.phase === "station" && intersects(dog, level.ballStation)) {
+    cb.phase = "held";
+    statusEl.textContent = `${level.name}: Ball on your nose`;
+  }
+
+  if (cb.phase === "tossed") {
+    cb.vy += CIRCUS_BALL_GRAVITY * frames;
+    cb.y += cb.vy * frames;
+    if (cb.vy > 0 && cb.y >= restY) {
+      if (Math.abs(cb.x - nose.x) < 24) {
+        cb.phase = "held";
+        cb.y = restY;
+        cb.vy = 0;
+        statusEl.textContent = `${level.name}: Caught. Hold up to balance`;
+      } else if (cb.y > dog.y + dog.h) {
+        cb.phase = "held";
+        cb.vy = 0;
+        statusEl.textContent = `${level.name}: Missed. Bark to toss again`;
+      }
+    }
+  }
+
+  if (cb.phase === "held") {
+    cb.x = nose.x;
+    cb.y = restY;
+    if (dog.onGround) state.jumpBufferedUntil = 0;
+    if (dog.onGround && !state.keys.left && !state.keys.right && state.keys.jump) {
+      cb.phase = "nose";
+      cb.balanceMs = 0;
+    }
+  }
+
+  if (cb.phase === "nose") {
+    state.jumpBufferedUntil = 0;
+    cb.x = nose.x;
+    cb.y = restY;
+    const stillBalanced = dog.onGround && !state.keys.left && !state.keys.right && state.keys.jump;
+    if (!stillBalanced) {
+      cb.phase = "held";
+      cb.balanceMs = 0;
+      statusEl.textContent = `${level.name}: Ball slipped. Bark to toss again`;
+    } else {
+      cb.balanceMs += dt;
+      if (cb.balanceMs >= CIRCUS_BALANCE_MS) {
+        cb.phase = "done";
+        cb.balanceMs = CIRCUS_BALANCE_MS;
+        const gate = level.lockedGate;
+        if (gate && !gate.open) {
+          gate.open = true;
+          gate.openedAt = now;
+        }
+        statusEl.textContent = `${level.name}: Gate open!`;
+        playBoneSound();
+      }
+    }
+  }
+}
+
+// Flame hoops: pass through the opening while airborne. Gate blocks until opened.
+function updateCircusHazards(level, now) {
+  if (!level?.circus) return;
+  const dog = state.dog;
+  for (const hoop of level.flameHoops || []) {
+    const inColumn = dog.x + dog.w > hoop.x - 7 && dog.x < hoop.x + 7;
+    if (!inColumn) continue;
+    const holeTop = hoop.y - hoop.r + 14;
+    const holeBottom = hoop.y + hoop.r - 14;
+    const throughHole = dog.y >= holeTop && dog.y + dog.h <= holeBottom;
+    if (!throughHole) {
+      takeHit("Singed by the flaming hoop!");
+      return;
+    }
+  }
+
+  const gate = level.lockedGate;
+  if (gate && !gate.open && intersects(dog, gate)) {
+    const fromLeft = dog.x + dog.w / 2 < gate.x + gate.w / 2;
+    dog.x = fromLeft ? gate.x - dog.w : gate.x + gate.w;
+    dog.vx = 0;
+  }
+}
+
+function drawCircusBackdrop(cam) {
+  const now = Date.now();
+  const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  g.addColorStop(0, "#1c1046");
+  g.addColorStop(0.65, "#3a1a52");
+  g.addColorStop(1, "#5b2a3e");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Big-top canopy: alternating stripes with a scalloped edge.
+  const stripeW = 64;
+  const offset = -((cam * 0.12) % (stripeW * 2));
+  for (let x = offset - stripeW * 2; x < canvas.width + stripeW * 2; x += stripeW) {
+    const idx = Math.round(x / stripeW);
+    ctx.fillStyle = Math.abs(idx) % 2 === 0 ? "#d63b4f" : "#f6efe0";
+    ctx.fillRect(x, 0, stripeW, 70);
+    ctx.beginPath();
+    ctx.arc(x + stripeW / 2, 70, stripeW / 2, 0, Math.PI);
+    ctx.fill();
+  }
+
+  // Spotlight beams.
+  ctx.save();
+  ctx.globalAlpha = 0.07 + Math.sin(now * 0.002) * 0.02;
+  ctx.fillStyle = "#fff4c2";
+  for (let i = 0; i < 3; i++) {
+    const sx = canvas.width * (0.2 + i * 0.3) + Math.sin(now * 0.0009 + i) * 40;
+    ctx.beginPath();
+    ctx.moveTo(sx, 70);
+    ctx.lineTo(sx - 120, canvas.height);
+    ctx.lineTo(sx + 120, canvas.height);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // Seals on pedestals, some balancing balls.
+  const sealSpacing = 230;
+  const sealDrift = cam * 0.35;
+  const wrap = canvas.width + sealSpacing * 2;
+  const sealCount = Math.ceil(wrap / sealSpacing);
+  for (let i = 0; i < sealCount; i++) {
+    const x = ((i * sealSpacing - sealDrift) % wrap + wrap) % wrap - sealSpacing;
+    drawCircusSeal(x, 392, i, now);
+  }
+}
+
+function drawCircusSeal(x, y, i, now) {
+  const bob = Math.sin(now * 0.004 + i * 1.3) * 2;
+  ctx.save();
+  ctx.fillStyle = "#e9e0d0";
+  ctx.fillRect(x - 14, y + 20, 36, 30);
+  ctx.fillStyle = "#7f9bb0";
+  ctx.beginPath();
+  ctx.ellipse(x, y + bob, 34, 18, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(x + 26, y - 12 + bob, 14, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(x - 4, y + 12 + bob, 12, 6, -0.4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#14202b";
+  ctx.beginPath();
+  ctx.arc(x + 31, y - 15 + bob, 2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#dfe8ef";
+  ctx.lineWidth = 1;
+  for (let w = -1; w <= 1; w++) {
+    ctx.beginPath();
+    ctx.moveTo(x + 36, y - 10 + bob + w * 3);
+    ctx.lineTo(x + 46, y - 10 + bob + w * 4);
+    ctx.stroke();
+  }
+  if (i % 2 === 0) {
+    const ballY = y - 34 + bob + Math.sin(now * 0.006 + i) * 2;
+    ctx.fillStyle = "#ff5c6e";
+    ctx.beginPath();
+    ctx.arc(x + 26, ballY, 7, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawCircusProps(level, now) {
+  const st = level.ballStation;
+  if (st) {
+    ctx.fillStyle = "#b8232f";
+    ctx.fillRect(st.x, st.y, st.w, st.h);
+    ctx.fillStyle = "#f6efe0";
+    ctx.fillRect(st.x + 8, st.y + 10, st.w - 16, 6);
+  }
+  for (const hoop of level.flameHoops || []) drawFlameHoop(hoop, now);
+  drawLockedGate(level.lockedGate, now);
+}
+
+function drawFlameHoop(hoop, now) {
+  const { x, y, r } = hoop;
+  ctx.save();
+  ctx.lineWidth = 10;
+  ctx.strokeStyle = "#ff7a1a";
+  ctx.shadowColor = "#ff3b00";
+  ctx.shadowBlur = 18;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = "#ffd34d";
+  ctx.beginPath();
+  ctx.arc(x, y, r - 3, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = "#ffb020";
+  const tongues = 14;
+  for (let i = 0; i < tongues; i++) {
+    const a = (i / tongues) * Math.PI * 2;
+    const flick = 6 + Math.sin(now * 0.02 + i * 1.7) * 4;
+    const tipR = r + flick + 6;
+    ctx.beginPath();
+    ctx.moveTo(x + Math.cos(a - 0.1) * (r + 4), y + Math.sin(a - 0.1) * (r + 4));
+    ctx.lineTo(x + Math.cos(a) * tipR, y + Math.sin(a) * tipR);
+    ctx.lineTo(x + Math.cos(a + 0.1) * (r + 4), y + Math.sin(a + 0.1) * (r + 4));
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawLockedGate(gate, now) {
+  if (!gate) return;
+  let lift = 0;
+  if (gate.open) {
+    lift = Math.min(1, (now - gate.openedAt) / 700);
+    if (lift >= 1) return;
+  }
+  const y = gate.y - lift * (gate.h + 120);
+  ctx.save();
+  ctx.fillStyle = gate.open ? "#b58b3a" : "#8f6a2c";
+  ctx.fillRect(gate.x, y, gate.w, gate.h);
+  ctx.strokeStyle = "#ffd34d";
+  ctx.lineWidth = 3;
+  for (let bx = gate.x + 4; bx < gate.x + gate.w; bx += 7) {
+    ctx.beginPath();
+    ctx.moveTo(bx, y + 4);
+    ctx.lineTo(bx, y + gate.h - 4);
+    ctx.stroke();
+  }
+  if (!gate.open) {
+    ctx.fillStyle = "#c9c9d6";
+    ctx.fillRect(gate.x - 4, y + gate.h * 0.45, gate.w + 8, 16);
+    ctx.strokeStyle = "#c9c9d6";
+    ctx.beginPath();
+    ctx.arc(gate.x + gate.w / 2, y + gate.h * 0.45, 8, Math.PI, 0);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawCircusBallAndTimer(level, now) {
+  const cb = level.circusBall;
+  if (!cb || cb.phase === "done") return;
+  let x;
+  let y;
+  if (cb.phase === "station") {
+    const st = level.ballStation;
+    x = st.x + st.w / 2;
+    y = st.y - CIRCUS_BALL_R;
+  } else if (cb.phase === "held" || cb.phase === "nose") {
+    const nose = circusNosePoint();
+    x = nose.x;
+    y = nose.y;
+  } else {
+    x = cb.x;
+    y = cb.y;
+  }
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x, y, CIRCUS_BALL_R, 0, Math.PI * 2);
+  ctx.fillStyle = "#ffd34d";
+  ctx.fill();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = "#d63b4f";
+  ctx.stroke();
+  ctx.restore();
+
+  if (cb.phase === "nose") {
+    const remaining = Math.max(1, Math.ceil((CIRCUS_BALANCE_MS - cb.balanceMs) / 1000));
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.font = "bold 34px 'Roboto', system-ui";
+    ctx.fillStyle = "#fff0a8";
+    ctx.shadowColor = "#ff3eaa";
+    ctx.shadowBlur = 14;
+    ctx.fillText(String(remaining), state.dog.x + state.dog.w / 2, state.dog.y - 34);
+    ctx.restore();
+  }
+}
+
 function updateCasinoSmoke(level, now) {
   if (!level.casino) return;
   if (state.smokeSneezeRemaining === 0 && now >= state.smokeSneezeBurstUntil) {
@@ -3389,6 +3738,7 @@ function update() {
   updateSirens(level);
   updateToyProjectile(level);
   updateLightSwitches(level);
+  updateCircus(level, now);
 
   if (level.tunnel && level.tunnelEntrance && !state.tunnelBurstDone) {
     const entry = level.tunnelEntrance;
@@ -3579,6 +3929,7 @@ function update() {
   }
 
   resolvePlayerPenetration(level);
+  updateCircusHazards(level, now);
 
   if (dog.onGround) state.airJumpsUsed = 0;
 
@@ -3732,6 +4083,11 @@ function update() {
 function drawParallax() {
   const cam = state.cameraX;
   const level = levelRuntime;
+
+  if (level.circus) {
+    drawCircusBackdrop(cam);
+    return;
+  }
 
   if (level.casino) {
     const now = Date.now();
@@ -6025,6 +6381,7 @@ function render() {
 
   for (const pool of level.lavaPools || []) drawLavaPool(pool);
   for (const p of level.platforms) drawPlatform(p);
+  drawCircusProps(level, now);
   for (const tray of level.ashtrays || []) drawCasinoAshtray(tray, now);
   for (const burst of state.dirtBursts) {
     ctx.fillStyle = burst.color;
@@ -6046,6 +6403,7 @@ function render() {
   if (state.toyProjectile) drawToyProjectile(state.toyProjectile);
   drawFlag(level.finishFlag);
   drawDachshund(state.dog);
+  drawCircusBallAndTimer(level, now);
 
   ctx.restore();
 
