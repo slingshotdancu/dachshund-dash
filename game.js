@@ -159,6 +159,10 @@ const WATER_MAX_VX = 2.4;
 const MOON_GRAVITY_FACTOR = 0.3;
 const MOON_JUMP_VELOCITY_FACTOR = 0.88;
 const MOON_MAX_FALL_SPEED = 6;
+const WIND_INTERVAL_MS = 30_000;
+const WIND_WARNING_MS = 2_400;
+const WIND_GUST_MS = 4_000;
+const WIND_PUSH_SPEED = 5;
 const CLOUD_PLATFORM_HOLD_MS = 2200;
 const CLOUD_PLATFORM_RESPAWN_MS = 3200;
 const DARK_SWITCH_REVEAL_MS = 5000;
@@ -507,6 +511,8 @@ if (LEVELS[5] && LEVELS[5].platforms && LEVELS[5].platforms[1]) {
 // Practice pass: add more visual/gameplay variety with less on-screen reading.
 if (LEVELS[2]) LEVELS[2].water = true;
 if (LEVELS[3]) LEVELS[3].moon = true;
+if (LEVELS[10]) LEVELS[10].night = true;
+if (LEVELS[11]) LEVELS[11].windGusts = true;
 if (LEVELS[4]) {
   LEVELS[4].volcano = true;
   LEVELS[4].lavaPools = buildLavaPools(LEVELS[4].platforms, LEVELS[4].worldWidth);
@@ -1988,10 +1994,6 @@ function openLevelSelect() {
       stats.appendChild(pill);
     });
 
-    const hazards = document.createElement("span");
-    hazards.className = "level-btn-hazards";
-    hazards.textContent = levelSelectHazardText(lvl);
-
     const tip = document.createElement("span");
     tip.className = "level-btn-tip";
     tip.textContent = levelSelectTipText(lvl);
@@ -2012,10 +2014,10 @@ function openLevelSelect() {
     meta.className = "level-btn-meta";
     meta.textContent = badges.length ? badges.join(" • ") : "Classic run";
 
-    btn.append(levelLabel, currentBadge, stage, tip, hazards, stats, meta);
+    btn.append(levelLabel, currentBadge, stage, tip, stats, meta);
     btn.setAttribute(
       "aria-label",
-      `${isCurrentLevel ? `${state.mode === "start" ? "Default start, " : "Current level, "}` : ""}${lvl.name}, ${levelSelectStageText(lvl)}, ${levelSelectHazardText(lvl).replace(/^Hazards:\s*/, "")}, ${pickupBits.join(", ")}${badges.length ? `, ${badges.join(", ")}` : ", classic run"}`
+      `${isCurrentLevel ? `${state.mode === "start" ? "Default start, " : "Current level, "}` : ""}${lvl.name}, ${levelSelectStageText(lvl)}, ${pickupBits.join(", ")}${badges.length ? `, ${badges.join(", ")}` : ", classic run"}`
     );
     if (isCurrentLevel) currentLevelBtn = btn;
     btn.addEventListener("click", () => {
@@ -2728,6 +2730,8 @@ function hydrateLevelRuntime(level) {
     toys: (level.toys || []).map((t) => ({ ...t })),
     lightSwitches: (level.lightSwitches || []).map((s) => ({ ...s, on: false, wasTouching: false, litUntil: 0, rearmLocked: false })),
     darkRevealUntil: 0,
+    windNextAt: 0,
+    windGustUntil: 0,
   };
 }
 
@@ -3044,6 +3048,10 @@ function beginLevelPlay() {
     handleJumpRelease();
   }
   state.mode = "playing";
+  if (levelRuntime.windGusts) {
+    levelRuntime.windNextAt = Date.now() + WIND_INTERVAL_MS;
+    levelRuntime.windGustUntil = 0;
+  }
   const bossHint = levelRuntime.boss ? ` • BOSS LEVEL: ${levelRuntime.boss.name}` : "";
   statusEl.textContent = `${levelRuntime.name}: Collect ${state.totalBones} bones and reach the flag!${bossHint}`;
 }
@@ -3267,6 +3275,16 @@ function updateLightSwitches(level) {
   }
 }
 
+function updateWindGustCycle(level, now) {
+  if (!level.windGusts) return false;
+  if (!level.windNextAt) level.windNextAt = now + WIND_INTERVAL_MS;
+  if (now >= level.windNextAt) {
+    level.windGustUntil = now + WIND_GUST_MS;
+    level.windNextAt = now + WIND_INTERVAL_MS;
+  }
+  return now < level.windGustUntil;
+}
+
 function update() {
   const jumpPressedNow = state.jumpPressedThisFrame;
   state.jumpPressedThisFrame = false;
@@ -3316,6 +3334,7 @@ function update() {
 
   const dog = state.dog;
   const level = levelRuntime;
+  const windActive = updateWindGustCycle(level, now);
 
   if (dog.onGround) state.lastGroundedAt = now;
 
@@ -3370,7 +3389,9 @@ function update() {
       state.barkWagUntil = Math.max(state.barkWagUntil, Date.now() + 400);
     }
 
-    const noMovementInput = !state.keys.left && !state.keys.right && !state.keys.jump && !state.keys.down;
+    if (windActive) dog.vx = Math.max(-WIND_PUSH_SPEED, dog.vx - WIND_PUSH_SPEED);
+
+    const noMovementInput = !state.keys.left && !state.keys.right && !state.keys.jump && !state.keys.down && !windActive;
     if (noMovementInput && dog.onGround) {
       if (Date.now() > state.idleNextWagAt) {
         state.idleWagUntil = Date.now() + 1400;
@@ -3743,6 +3764,64 @@ function drawParallax() {
       const x = i * 190 - cam * 0.45;
       ctx.beginPath();
       ctx.arc(x + 70, 520, 95, Math.PI, Math.PI * 2);
+      ctx.fill();
+    }
+    return;
+  }
+
+  if (level.night) {
+    const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    g.addColorStop(0, "#050a18");
+    g.addColorStop(0.62, "#101a30");
+    g.addColorStop(1, "#20283b");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const now = Date.now();
+    const starSpan = canvas.width + 80;
+    for (let i = 0; i < 64; i++) {
+      const x = ((i * 139 - cam * 0.055) % starSpan + starSpan) % starSpan - 40;
+      const y = 24 + (i * 47) % 235;
+      const radius = i % 9 === 0 ? 2 : 1.2;
+      const alpha = 0.5 + (Math.sin(now * 0.002 + i * 1.7) + 1) * 0.2;
+      ctx.fillStyle = `rgba(230, 240, 255, ${alpha})`;
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    const moonX = canvas.width * 0.73 - cam * 0.018;
+    const moonY = 92;
+    const moonGlow = ctx.createRadialGradient(moonX, moonY, 10, moonX, moonY, 74);
+    moonGlow.addColorStop(0, "rgba(255, 242, 194, 0.28)");
+    moonGlow.addColorStop(1, "rgba(255, 242, 194, 0)");
+    ctx.fillStyle = moonGlow;
+    ctx.beginPath();
+    ctx.arc(moonX, moonY, 74, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#f2e9c6";
+    ctx.beginPath();
+    ctx.arc(moonX, moonY, 30, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(155, 158, 172, 0.3)";
+    ctx.beginPath();
+    ctx.arc(moonX - 10, moonY - 6, 5, 0, Math.PI * 2);
+    ctx.arc(moonX + 9, moonY + 8, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#131b2e";
+    for (let i = 0; i < 12; i++) {
+      const x = i * 250 - cam * 0.28;
+      ctx.beginPath();
+      ctx.arc(x + 110, 520, 160, Math.PI, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = "#0c1425";
+    for (let i = 0; i < 14; i++) {
+      const x = i * 210 - cam * 0.45;
+      ctx.beginPath();
+      ctx.arc(x + 72, 530, 112, Math.PI, Math.PI * 2);
       ctx.fill();
     }
     return;
@@ -5242,10 +5321,6 @@ function drawRunSnapshotCard(level, options = {}) {
   ctx.restore();
 }
 
-function drawPauseSummaryCard(level) {
-  drawRunSnapshotCard(level, { title: `${level.name} snapshot` });
-}
-
 function drawLogo(x, y, scale = 0.5) {
   const img = getImage(LOGO_IMG);
   if (!img || !img.complete || !img.naturalWidth) return;
@@ -5366,9 +5441,6 @@ function drawOverlay() {
     ctx.font = "bold 48px 'Flubby', 'Roboto', system-ui";
     ctx.textAlign = "center";
     ctx.fillText("PAUSED", canvas.width / 2, canvas.height / 2 - 108);
-    ctx.font = "18px 'Roboto', 'Roboto', system-ui";
-    ctx.fillStyle = "#d9fbff";
-    ctx.fillText("Quick status stays visible here so you can resume without losing the thread.", canvas.width / 2, canvas.height / 2 - 78);
     ctx.font = "22px 'Roboto', 'Roboto', system-ui";
     if (state.pauseMenu === "main") {
       const sel = state.pauseOptionIndex || 0;
@@ -5401,7 +5473,6 @@ function drawOverlay() {
       ctx.fillStyle = "#b8eef6";
       ctx.fillText("Touch: BARK switches row • ◀/▶ adjust • ▲ save", canvas.width / 2, canvas.height / 2 + 78);
     }
-    drawPauseSummaryCard(levelRuntime);
     ctx.textAlign = "start";
     return;
   }
@@ -5466,6 +5537,42 @@ function drawOverlay() {
   ctx.textAlign = "start";
 }
 
+function drawWindGustEffects(level, now) {
+  if (!level.windGusts || state.mode !== "playing") return;
+  const gustActive = now < level.windGustUntil;
+  const timeUntilGust = level.windNextAt - now;
+  const warning = timeUntilGust > 0 && timeUntilGust <= WIND_WARNING_MS;
+  if (!gustActive && !warning) return;
+
+  const span = canvas.width + 100;
+  const speed = gustActive ? 0.48 : 0.16;
+  ctx.save();
+  for (let i = 0; i < 15; i++) {
+    const travel = (now * speed + i * 137) % span;
+    const x = canvas.width + 50 - travel;
+    const y = 62 + (i * 73) % (canvas.height - 124) + Math.sin(now * 0.008 + i) * 10;
+    const sway = Math.sin(now * 0.006 + i * 1.3) * 0.55;
+    ctx.save();
+    ctx.globalAlpha = gustActive ? 0.88 : 0.5;
+    ctx.translate(x, y);
+    ctx.rotate(sway);
+    ctx.fillStyle = ["#d99645", "#a9bd61", "#c86e43"][i % 3];
+    ctx.beginPath();
+    ctx.moveTo(-11, 0);
+    ctx.quadraticCurveTo(-1, -9, 12, -2);
+    ctx.quadraticCurveTo(5, 8, -11, 0);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255, 237, 190, 0.72)";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(-9, 0);
+    ctx.lineTo(9, -2);
+    ctx.stroke();
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
 function render() {
   const level = levelRuntime;
   const now = Date.now();
@@ -5517,6 +5624,13 @@ function render() {
   ctx.restore();
 
   drawDarknessOverlay(level);
+  drawWindGustEffects(level, now);
+  if (level.night) {
+    ctx.save();
+    ctx.fillStyle = "rgba(3, 7, 20, 0.2)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  }
   if (level.moon && state.mode === "playing" && state.dog.y + state.dog.h < 0) {
     const markerX = Math.max(14, Math.min(canvas.width - 14, state.dog.x + state.dog.w / 2 - state.cameraX));
     ctx.save();
