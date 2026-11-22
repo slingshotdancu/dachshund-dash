@@ -3,8 +3,8 @@
 ## 2026-11-22
 ### Level 15 becomes a circus
 - Added a big-top backdrop with striped canopy, spotlights, and seals on pedestals (some balancing balls).
-- Added two flaming hoops: jump through the opening while airborne; touching the ring costs a life.
-- Added a ball station: step on it to get the ball on your nose. Bark tosses it up; hold Up on the ground while standing still to balance it. A 3-2-1 countdown runs while you hold Up, and releasing Up resets it.
+- Added two larger flaming rings, turned to face Henry's run so the hole reads as a 3D opening: jump through it while airborne; touching the ring costs a life.
+- Added a ball station: step on it to get the ball on your nose. Hold Up while standing still to balance: Henry stands upright on his tail with a 3-2-1 countdown. Bark bounces the ball while you keep holding Up. Left and right still work while balancing. Letting go of Up drops the ball, and you have to walk away and back to pick it up, then hold Up for the full 3 seconds again.
 - A previously locked gate opens when the countdown reaches 0, leading to the finish flag.
 - Verified in headless Chrome: gate blocks until opened, toss-and-catch works, holding Up balances without jumping, release resets, hoop hits and clean passes behave correctly.
 

@@ -658,7 +658,7 @@ if (LEVELS[14]) {
   L.toys = [];
   L.boss = null;
   L.bones = [300, 600, 1000, 1180, 1700, 2180, 2620, 2950].map((x) => ({ x, y: 458, r: 11 }));
-  L.flameHoops = [{ x: 820, y: 400, r: 62 }, { x: 1360, y: 400, r: 62 }];
+  L.flameHoops = [{ x: 820, y: 380, r: 78 }, { x: 1360, y: 380, r: 78 }];
   L.ballStation = { x: 1960, y: 470, w: 90, h: 30 };
   L.lockedGate = { x: 2420, y: 140, w: 22, h: 360 };
   L.finishFlag = { x: 3280, y: 360, w: 16, h: 140 };
@@ -2771,7 +2771,7 @@ function hydrateLevelRuntime(level) {
     windNextAt: 0,
     windGustUntil: 0,
     stormStartedAt: 0,
-    circusBall: level.circus ? { phase: "station", x: 0, y: 0, vy: 0, balanceMs: 0, lastAt: 0 } : null,
+    circusBall: level.circus ? { phase: "station", x: 0, y: 0, vy: 0, vx: 0, balanceMs: 0, lastAt: 0, balancing: false, grounded: false } : null,
     flameHoops: (level.flameHoops || []).map((h) => ({ ...h })),
     ballStation: level.ballStation ? { ...level.ballStation } : null,
     lockedGate: level.lockedGate ? { ...level.lockedGate, open: false, openedAt: 0 } : null,
@@ -3339,32 +3339,80 @@ function updateWindGustCycle(level, now) {
 // ---- Level 15: circus ----
 const CIRCUS_BALANCE_MS = 3000;
 const CIRCUS_BALL_R = 8;
-const CIRCUS_TOSS_VY = -11;
+const CIRCUS_TOSS_VY = -10;
 const CIRCUS_BALL_GRAVITY = 0.5;
+const CIRCUS_CATCH_X = 26;
+const CIRCUS_ROLL_SPEED = 3;
 
-function circusNosePoint(dog = state.dog) {
+// Vertical pose: the body's length stands up and the tail rests on the ground line.
+function circusHeadTop(dog = state.dog) {
+  return dog.y + dog.h - dog.w;
+}
+
+function circusNosePoint(dog = state.dog, vertical = false) {
+  if (vertical) return { x: dog.x + dog.w / 2, y: circusHeadTop(dog) - CIRCUS_BALL_R };
   return { x: dog.facing > 0 ? dog.x + dog.w - 12 : dog.x + 12, y: dog.y - CIRCUS_BALL_R + 4 };
 }
 
-function resetCircusBall(level) {
-  if (!level?.circusBall || level.circusBall.phase === "done") return;
-  level.circusBall.phase = "station";
-  level.circusBall.balanceMs = 0;
-  level.circusBall.vy = 0;
+function circusBallRect(cb) {
+  return { x: cb.x - CIRCUS_BALL_R, y: cb.y - CIRCUS_BALL_R, w: CIRCUS_BALL_R * 2, h: CIRCUS_BALL_R * 2 };
 }
 
-// Bark while the ball rests on the nose throws it upward.
+function resetCircusBall(level) {
+  const cb = level?.circusBall;
+  if (!cb || cb.phase === "done") return;
+  cb.phase = "station";
+  cb.balancing = false;
+  cb.grounded = false;
+  cb.balanceMs = 0;
+  cb.vy = 0;
+  cb.vx = 0;
+}
+
+// Bark throws the ball: from the nose while balancing (keeps the timer going), or from a plain held pose.
 function circusTossBall() {
   const level = levelRuntime;
   const cb = level?.circusBall;
-  if (!level?.circus || !cb || cb.phase !== "held" || state.mode !== "playing") return false;
-  const nose = circusNosePoint();
+  if (!level?.circus || !cb || state.mode !== "playing") return false;
+  if (cb.phase !== "held" && cb.phase !== "nose") return false;
+  const balancing = cb.phase === "nose";
+  const nose = circusNosePoint(state.dog, balancing);
   cb.phase = "tossed";
+  cb.balancing = balancing;
   cb.x = nose.x;
   cb.y = nose.y;
   cb.vy = CIRCUS_TOSS_VY;
   playSuperBarkSound();
   return true;
+}
+
+function circusDrop(level, cb, message) {
+  cb.phase = "dropped";
+  cb.balancing = false;
+  cb.grounded = false;
+  cb.pickupArmed = false;
+  cb.balanceMs = 0;
+  cb.vy = 0;
+  cb.vx = 0;
+  statusEl.textContent = `${level.name}: ${message}`;
+}
+
+function circusCompleteBalance(level, cb, now) {
+  cb.phase = "done";
+  cb.balancing = false;
+  cb.balanceMs = CIRCUS_BALANCE_MS;
+  const gate = level.lockedGate;
+  if (gate && !gate.open) {
+    gate.open = true;
+    gate.openedAt = now;
+  }
+  statusEl.textContent = `${level.name}: Gate open!`;
+  playBoneSound();
+}
+
+function circusTickBalance(level, cb, dt, now) {
+  cb.balanceMs += dt;
+  if (cb.balanceMs >= CIRCUS_BALANCE_MS) circusCompleteBalance(level, cb, now);
 }
 
 function updateCircus(level, now) {
@@ -3374,62 +3422,99 @@ function updateCircus(level, now) {
   const dt = Math.min(64, now - (cb.lastAt || now));
   cb.lastAt = now;
   const frames = dt / 16.67;
-  const nose = circusNosePoint(dog);
-  const restY = nose.y;
+  const upHeld = state.keys.jump;
+  const onGround = dog.onGround;
+  const dropMessage = "Ball dropped. Go pick it up and hold Up again";
 
   if (cb.phase === "station" && intersects(dog, level.ballStation)) {
     cb.phase = "held";
-    statusEl.textContent = `${level.name}: Ball on your nose`;
+    cb.balanceMs = 0;
+    statusEl.textContent = `${level.name}: Ball on your nose. Hold Up to balance`;
   }
 
-  if (cb.phase === "tossed") {
-    cb.vy += CIRCUS_BALL_GRAVITY * frames;
-    cb.y += cb.vy * frames;
-    if (cb.vy > 0 && cb.y >= restY) {
-      if (Math.abs(cb.x - nose.x) < 24) {
-        cb.phase = "held";
-        cb.y = restY;
+  if (cb.phase === "dropped") {
+    cb.x += cb.vx * frames;
+    cb.vx *= Math.pow(0.9, frames);
+    if (Math.abs(cb.vx) < 0.05) cb.vx = 0;
+    cb.x = Math.max(CIRCUS_BALL_R, Math.min(level.worldWidth - CIRCUS_BALL_R, cb.x));
+    if (!cb.grounded) {
+      cb.vy += CIRCUS_BALL_GRAVITY * frames;
+      cb.y += cb.vy * frames;
+      const floorY = level.platforms[0].y - CIRCUS_BALL_R;
+      if (cb.y >= floorY) {
+        cb.y = floorY;
         cb.vy = 0;
-        statusEl.textContent = `${level.name}: Caught. Hold up to balance`;
-      } else if (cb.y > dog.y + dog.h) {
-        cb.phase = "held";
-        cb.vy = 0;
-        statusEl.textContent = `${level.name}: Missed. Bark to toss again`;
+        cb.grounded = true;
       }
+    } else if (!intersects(dog, circusBallRect(cb))) {
+      cb.pickupArmed = true;
+    } else if (cb.pickupArmed) {
+      cb.phase = "held";
+      cb.grounded = false;
+      cb.pickupArmed = false;
+      cb.vx = 0;
+      statusEl.textContent = `${level.name}: Picked up. Hold Up to balance`;
     }
   }
 
   if (cb.phase === "held") {
+    const nose = circusNosePoint(dog, false);
     cb.x = nose.x;
-    cb.y = restY;
-    if (dog.onGround) state.jumpBufferedUntil = 0;
-    if (dog.onGround && !state.keys.left && !state.keys.right && state.keys.jump) {
+    cb.y = nose.y;
+    if (onGround && upHeld) {
       cb.phase = "nose";
+      cb.balancing = true;
       cb.balanceMs = 0;
+      state.jumpBufferedUntil = 0;
+      statusEl.textContent = `${level.name}: Balancing`;
     }
   }
 
   if (cb.phase === "nose") {
     state.jumpBufferedUntil = 0;
+    const nose = circusNosePoint(dog, true);
     cb.x = nose.x;
-    cb.y = restY;
-    const stillBalanced = dog.onGround && !state.keys.left && !state.keys.right && state.keys.jump;
-    if (!stillBalanced) {
-      cb.phase = "held";
-      cb.balanceMs = 0;
-      statusEl.textContent = `${level.name}: Ball slipped. Bark to toss again`;
+    cb.y = nose.y;
+    if (!onGround || !upHeld) {
+      circusDrop(level, cb, dropMessage);
     } else {
-      cb.balanceMs += dt;
-      if (cb.balanceMs >= CIRCUS_BALANCE_MS) {
-        cb.phase = "done";
-        cb.balanceMs = CIRCUS_BALANCE_MS;
-        const gate = level.lockedGate;
-        if (gate && !gate.open) {
-          gate.open = true;
-          gate.openedAt = now;
+      circusTickBalance(level, cb, dt, now);
+    }
+  }
+
+  if (cb.phase === "tossed") {
+    if (cb.balancing) {
+      state.jumpBufferedUntil = 0;
+      if (!onGround || !upHeld) {
+        circusDrop(level, cb, dropMessage);
+      } else {
+        circusTickBalance(level, cb, dt, now);
+        if (cb.phase === "tossed") {
+          const nose = circusNosePoint(dog, true);
+          cb.x = nose.x;
+          cb.vy += CIRCUS_BALL_GRAVITY * frames;
+          cb.y += cb.vy * frames;
+          if (cb.vy > 0 && cb.y >= nose.y) {
+            cb.y = nose.y;
+            cb.vy = 0;
+            cb.phase = "nose";
+          }
         }
-        statusEl.textContent = `${level.name}: Gate open!`;
-        playBoneSound();
+      }
+    } else {
+      const nose = circusNosePoint(dog, false);
+      cb.vy += CIRCUS_BALL_GRAVITY * frames;
+      cb.y += cb.vy * frames;
+      if (cb.vy > 0 && cb.y >= nose.y) {
+        if (Math.abs(cb.x - nose.x) < CIRCUS_CATCH_X) {
+          cb.phase = "held";
+          cb.x = nose.x;
+          cb.y = nose.y;
+          cb.vy = 0;
+          statusEl.textContent = `${level.name}: Caught. Hold Up to balance`;
+        } else {
+          circusDrop(level, cb, "Missed. Pick the ball up and try again");
+        }
       }
     }
   }
@@ -3442,9 +3527,10 @@ function updateCircusHazards(level, now) {
   for (const hoop of level.flameHoops || []) {
     const inColumn = dog.x + dog.w > hoop.x - 7 && dog.x < hoop.x + 7;
     if (!inColumn) continue;
-    const holeTop = hoop.y - hoop.r + 14;
-    const holeBottom = hoop.y + hoop.r - 14;
-    const throughHole = dog.y >= holeTop && dog.y + dog.h <= holeBottom;
+    const holeTop = hoop.y - hoop.r + 8;
+    const holeBottom = hoop.y + hoop.r - 8;
+    const bodyCenterY = dog.y + dog.h / 2;
+    const throughHole = bodyCenterY >= holeTop && bodyCenterY <= holeBottom;
     if (!throughHole) {
       takeHit("Singed by the flaming hoop!");
       return;
@@ -3551,39 +3637,55 @@ function drawCircusProps(level, now) {
     ctx.fillStyle = "#f6efe0";
     ctx.fillRect(st.x + 8, st.y + 10, st.w - 16, 6);
   }
-  for (const hoop of level.flameHoops || []) drawFlameHoop(hoop, now);
+  for (const hoop of level.flameHoops || []) drawFlameHoop(hoop, now, "back");
   drawLockedGate(level.lockedGate, now);
 }
 
-function drawFlameHoop(hoop, now) {
+// Rings sit turned about their vertical axis, so the hole faces Henry's run.
+const CIRCUS_HOOP_ANGLE = (75 * Math.PI) / 180;
+
+// part: "back" draws the far half (behind Henry), "front" the near half (over him).
+function drawFlameHoop(hoop, now, part) {
   const { x, y, r } = hoop;
+  const rx = Math.max(6, r * Math.abs(Math.cos(CIRCUS_HOOP_ANGLE)));
+  const near = part === "front";
+  const inHalf = (a) => (near ? Math.cos(a) >= 0 : Math.cos(a) < 0);
+  const a0 = near ? -Math.PI / 2 : Math.PI / 2;
+  const a1 = near ? Math.PI / 2 : (3 * Math.PI) / 2;
   ctx.save();
+  ctx.globalAlpha = near ? 1 : 0.7;
+  ctx.lineCap = "round";
   ctx.lineWidth = 10;
   ctx.strokeStyle = "#ff7a1a";
   ctx.shadowColor = "#ff3b00";
   ctx.shadowBlur = 18;
   ctx.beginPath();
-  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.ellipse(x, y, rx, r, 0, a0, a1);
   ctx.stroke();
   ctx.lineWidth = 3;
   ctx.strokeStyle = "#ffd34d";
   ctx.beginPath();
-  ctx.arc(x, y, r - 3, 0, Math.PI * 2);
+  ctx.ellipse(x, y, Math.max(2, rx - 3), r - 3, 0, a0, a1);
   ctx.stroke();
   ctx.fillStyle = "#ffb020";
-  const tongues = 14;
+  const tongues = 16;
   for (let i = 0; i < tongues; i++) {
     const a = (i / tongues) * Math.PI * 2;
+    if (!inHalf(a)) continue;
     const flick = 6 + Math.sin(now * 0.02 + i * 1.7) * 4;
-    const tipR = r + flick + 6;
     ctx.beginPath();
-    ctx.moveTo(x + Math.cos(a - 0.1) * (r + 4), y + Math.sin(a - 0.1) * (r + 4));
-    ctx.lineTo(x + Math.cos(a) * tipR, y + Math.sin(a) * tipR);
-    ctx.lineTo(x + Math.cos(a + 0.1) * (r + 4), y + Math.sin(a + 0.1) * (r + 4));
+    ctx.moveTo(x + rx * Math.cos(a - 0.1), y + r * Math.sin(a - 0.1));
+    ctx.lineTo(x + (rx + flick * 0.4) * Math.cos(a), y + (r + flick) * Math.sin(a));
+    ctx.lineTo(x + rx * Math.cos(a + 0.1), y + r * Math.sin(a + 0.1));
     ctx.closePath();
     ctx.fill();
   }
   ctx.restore();
+}
+
+function drawCircusHoopFronts(level, now) {
+  if (!level?.circus) return;
+  for (const hoop of level.flameHoops || []) drawFlameHoop(hoop, now, "front");
 }
 
 function drawLockedGate(gate, now) {
@@ -3616,22 +3718,37 @@ function drawLockedGate(gate, now) {
   ctx.restore();
 }
 
+function circusDogIsVertical(level) {
+  const cb = level?.circusBall;
+  return Boolean(cb && cb.balancing && (cb.phase === "nose" || cb.phase === "tossed"));
+}
+
+// Draws Henry standing on his tail with his nose up while balancing the ball.
+function drawCircusAwareDog(level) {
+  const dog = state.dog;
+  if (!circusDogIsVertical(level)) {
+    drawDachshund(dog);
+    return;
+  }
+  const cx = dog.x + dog.w / 2;
+  const cy = dog.y + dog.h / 2;
+  ctx.save();
+  ctx.translate(cx, cy + (dog.h - dog.w) / 2);
+  ctx.rotate(dog.facing > 0 ? -Math.PI / 2 : Math.PI / 2);
+  ctx.translate(-cx, -cy);
+  drawDachshund(dog);
+  ctx.restore();
+}
+
 function drawCircusBallAndTimer(level, now) {
   const cb = level.circusBall;
   if (!cb || cb.phase === "done") return;
-  let x;
-  let y;
+  let x = cb.x;
+  let y = cb.y;
   if (cb.phase === "station") {
     const st = level.ballStation;
     x = st.x + st.w / 2;
     y = st.y - CIRCUS_BALL_R;
-  } else if (cb.phase === "held" || cb.phase === "nose") {
-    const nose = circusNosePoint();
-    x = nose.x;
-    y = nose.y;
-  } else {
-    x = cb.x;
-    y = cb.y;
   }
   ctx.save();
   ctx.beginPath();
@@ -3643,7 +3760,7 @@ function drawCircusBallAndTimer(level, now) {
   ctx.stroke();
   ctx.restore();
 
-  if (cb.phase === "nose") {
+  if (cb.balancing && (cb.phase === "nose" || cb.phase === "tossed")) {
     const remaining = Math.max(1, Math.ceil((CIRCUS_BALANCE_MS - cb.balanceMs) / 1000));
     ctx.save();
     ctx.textAlign = "center";
@@ -3651,7 +3768,7 @@ function drawCircusBallAndTimer(level, now) {
     ctx.fillStyle = "#fff0a8";
     ctx.shadowColor = "#ff3eaa";
     ctx.shadowBlur = 14;
-    ctx.fillText(String(remaining), state.dog.x + state.dog.w / 2, state.dog.y - 34);
+    ctx.fillText(String(remaining), state.dog.x + state.dog.w + 22, state.dog.y + 10);
     ctx.restore();
   }
 }
@@ -6402,7 +6519,8 @@ function render() {
   for (const p of state.bossProjectiles) drawBossProjectile(p);
   if (state.toyProjectile) drawToyProjectile(state.toyProjectile);
   drawFlag(level.finishFlag);
-  drawDachshund(state.dog);
+  drawCircusAwareDog(level);
+  drawCircusHoopFronts(level, now);
   drawCircusBallAndTimer(level, now);
 
   ctx.restore();
