@@ -1,6 +1,15 @@
 # Dachshund Dash Changelog
 
 ## 2026-11-22
+### Level 11 Henry gets striped sleepwear
+- Added white-and-blue striped pajamas and a matching nightcap to Henry, drawn only on Level 11 (including his alternate pose).
+
+### Level 12 gets calmer gaps and a fuller leaf gust
+- Spaced Level 12 gusts to every 16 seconds, shortened each gust to 3 seconds, and softened the backward push. Added persistent ground leaves and a denser upward-swirling burst when wind arrives.
+
+### Level 14 becomes a neon casino
+- Added a packed, blinking slot-machine backdrop, neon casino lighting, and smoking cigarettes in decorative ashtrays. Getting close to a smoke plume triggers three quick sneezes; the props are harmless.
+
 ### Level 13 builds into a distant thunderstorm
 - Added a slow rain-to-downpour ramp over the first 45 seconds of Level 13. Rain increasingly slows forward movement, but never pushes Henry backward; jumping and other levels are unchanged.
 - Added brief background lightning and a far-off, purely decorative tornado behind the level scenery.

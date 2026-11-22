@@ -159,11 +159,11 @@ const WATER_MAX_VX = 2.4;
 const MOON_GRAVITY_FACTOR = 0.3;
 const MOON_JUMP_VELOCITY_FACTOR = 0.88;
 const MOON_MAX_FALL_SPEED = 6;
-const WIND_INTERVAL_MS = 7_000;
+const WIND_INTERVAL_MS = 16_000;
 const WIND_INITIAL_DELAY_MS = 1_800;
 const WIND_WARNING_MS = 2_400;
-const WIND_GUST_MS = 4_000;
-const WIND_PUSH_SPEED = 5;
+const WIND_GUST_MS = 3_000;
+const WIND_PUSH_SPEED = 2.8;
 const STORM_RAMP_MS = 45_000;
 const CLOUD_PLATFORM_HOLD_MS = 2200;
 const CLOUD_PLATFORM_RESPAWN_MS = 3200;
@@ -516,6 +516,13 @@ if (LEVELS[3]) LEVELS[3].moon = true;
 if (LEVELS[10]) LEVELS[10].night = true;
 if (LEVELS[11]) LEVELS[11].windGusts = true;
 if (LEVELS[12]) LEVELS[12].storm = true;
+if (LEVELS[13]) {
+  LEVELS[13].casino = true;
+  LEVELS[13].ashtrays = [
+    { x: 180, y: 482 }, { x: 870, y: 482 }, { x: 1530, y: 482 },
+    { x: 2240, y: 482 }, { x: 2920, y: 482 }, { x: 3620, y: 482 },
+  ];
+}
 if (LEVELS[4]) {
   LEVELS[4].volcano = true;
   LEVELS[4].lavaPools = buildLavaPools(LEVELS[4].platforms, LEVELS[4].worldWidth);
@@ -686,6 +693,9 @@ const state = {
   barkWagUntil: 0,
   sneezeUntil: 0,
   sneezeNextAt: Date.now() + 5000,
+  smokeSneezeRemaining: 0,
+  smokeSneezeNextAt: 0,
+  smokeSneezeBurstUntil: 0,
   backflipUntil: 0,
   backflipNextAt: Date.now() + 6000,
   danceUntil: 0,
@@ -2731,6 +2741,7 @@ function hydrateLevelRuntime(level) {
     boss,
     sirens: (level.sirens || []).map((s) => ({ ...s })),
     toys: (level.toys || []).map((t) => ({ ...t })),
+    ashtrays: (level.ashtrays || []).map((a) => ({ ...a, nextSneezeAt: 0 })),
     lightSwitches: (level.lightSwitches || []).map((s) => ({ ...s, on: false, wasTouching: false, litUntil: 0, rearmLocked: false })),
     darkRevealUntil: 0,
     windNextAt: 0,
@@ -2757,6 +2768,9 @@ function resetPlayerPosition() {
   state.barkWagUntil = 0;
   state.sneezeUntil = 0;
   state.sneezeNextAt = Date.now() + 5000;
+  state.smokeSneezeRemaining = 0;
+  state.smokeSneezeNextAt = 0;
+  state.smokeSneezeBurstUntil = 0;
   state.backflipUntil = 0;
   state.backflipNextAt = Date.now() + 6000;
   state.danceUntil = 0;
@@ -3019,6 +3033,9 @@ function loadLevel(index, options = {}) {
   state.toyProjectile = null;
   state.sneezeUntil = 0;
   state.sneezeNextAt = Date.now() + 5000;
+  state.smokeSneezeRemaining = 0;
+  state.smokeSneezeNextAt = 0;
+  state.smokeSneezeBurstUntil = 0;
   state.backflipUntil = 0;
   state.backflipNextAt = Date.now() + 6000;
   state.danceUntil = 0;
@@ -3290,6 +3307,32 @@ function updateWindGustCycle(level, now) {
   return now < level.windGustUntil;
 }
 
+function updateCasinoSmoke(level, now) {
+  if (!level.casino) return;
+  if (state.smokeSneezeRemaining === 0 && now >= state.smokeSneezeBurstUntil) {
+    const dogCenterX = state.dog.x + state.dog.w / 2;
+    const nearSmoke = level.ashtrays.find((tray) =>
+      now >= tray.nextSneezeAt &&
+      Math.abs(dogCenterX - (tray.x + 15)) < 58 &&
+      state.dog.y < tray.y + 8 &&
+      state.dog.y + state.dog.h > tray.y - 120
+    );
+    if (nearSmoke) {
+      nearSmoke.nextSneezeAt = now + 14_000;
+      state.smokeSneezeRemaining = 3;
+      state.smokeSneezeNextAt = now;
+      state.smokeSneezeBurstUntil = now + 1_250;
+      state.sneezeNextAt = now + 8_000;
+    }
+  }
+  if (state.smokeSneezeRemaining > 0 && now >= state.smokeSneezeNextAt) {
+    state.sneezeUntil = now + 230;
+    state.smokeSneezeRemaining -= 1;
+    state.smokeSneezeNextAt = now + 370;
+    playSneezeSound();
+  }
+}
+
 function update() {
   const jumpPressedNow = state.jumpPressedThisFrame;
   state.jumpPressedThisFrame = false;
@@ -3426,7 +3469,7 @@ function update() {
     } else {
       state.idleWagUntil = 0;
       state.idleNextWagAt = Date.now() + 1200;
-      state.sneezeUntil = 0;
+      if (state.smokeSneezeRemaining === 0 && now >= state.smokeSneezeBurstUntil) state.sneezeUntil = 0;
       state.sneezeNextAt = Date.now() + 5000;
       state.backflipUntil = 0;
       state.backflipNextAt = Date.now() + 7000;
@@ -3436,6 +3479,8 @@ function update() {
       state.digNextAt = Date.now() + 7000;
     }
   }
+
+  updateCasinoSmoke(level, now);
 
   const capeActive = Date.now() < state.capeUntil;
   const waterMode = Boolean(level.water && !capeActive);
@@ -3687,6 +3732,93 @@ function update() {
 function drawParallax() {
   const cam = state.cameraX;
   const level = levelRuntime;
+
+  if (level.casino) {
+    const now = Date.now();
+    const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    g.addColorStop(0, "#160d2b");
+    g.addColorStop(0.68, "#311436");
+    g.addColorStop(1, "#5a2639");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = "#100b21";
+    ctx.fillRect(0, 0, canvas.width, 110);
+    for (let i = 0; i < 18; i++) {
+      const x = i * 72 - cam * 0.08;
+      const blink = 0.45 + (Math.sin(now * 0.004 + i * 1.8) + 1) * 0.25;
+      ctx.globalAlpha = blink;
+      ctx.fillStyle = ["#ff3eaa", "#43eaff", "#ffd84b", "#a66bff"][i % 4];
+      ctx.shadowColor = ctx.fillStyle;
+      ctx.shadowBlur = 15;
+      ctx.beginPath();
+      ctx.arc(x, 42 + (i % 2) * 13, 5 + (i % 3), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
+
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.font = "bold 36px 'Roboto', system-ui";
+    ctx.fillStyle = "#fff0a8";
+    ctx.shadowColor = "#ff3eaa";
+    ctx.shadowBlur = 24;
+    ctx.fillText("CASINO", canvas.width * 0.52, 103);
+    ctx.restore();
+
+    // Two parallax rows make the casino feel packed without obscuring play.
+    for (let row = 0; row < 2; row++) {
+      const cabinetY = row === 0 ? 150 : 245;
+      const cabinetH = row === 0 ? 195 : 165;
+      const drift = row === 0 ? 0.18 : 0.34;
+      const cabinetW = row === 0 ? 78 : 66;
+      const count = row === 0 ? 11 : 13;
+      for (let i = 0; i < count; i++) {
+        const x = ((i * (cabinetW + 27) - cam * drift) % (canvas.width + cabinetW + 80) + canvas.width + cabinetW + 80) % (canvas.width + cabinetW + 80) - cabinetW;
+        const color = ["#ff4fa3", "#43dcff", "#ffc94f", "#ad75ff"][i % 4];
+        const blink = 0.72 + (Math.sin(now * 0.006 + i * 2.1 + row) + 1) * 0.14;
+        ctx.save();
+        ctx.globalAlpha = blink;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 12;
+        ctx.fillStyle = "#261c38";
+        ctx.fillRect(x, cabinetY, cabinetW, cabinetH);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3;
+        ctx.strokeRect(x, cabinetY, cabinetW, cabinetH);
+        ctx.fillStyle = color;
+        ctx.fillRect(x + 8, cabinetY + 8, cabinetW - 16, 20);
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = "#f4e9ff";
+        ctx.fillRect(x + 8, cabinetY + 36, cabinetW - 16, cabinetH * 0.39);
+        for (let reel = 0; reel < 3; reel++) {
+          const cx = x + cabinetW * (0.28 + reel * 0.23);
+          const cy = cabinetY + cabinetH * 0.53;
+          ctx.fillStyle = ["#e9406e", "#e9ae39", "#834ee0"][(i + reel) % 3];
+          ctx.beginPath();
+          ctx.arc(cx, cy, 5 + (reel % 2), 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.fillStyle = color;
+        ctx.fillRect(x + 13, cabinetY + cabinetH - 28, cabinetW - 26, 11);
+        ctx.restore();
+      }
+    }
+
+    ctx.fillStyle = "#24102b";
+    ctx.fillRect(0, 410, canvas.width, canvas.height - 410);
+    ctx.strokeStyle = "rgba(255, 71, 172, 0.32)";
+    ctx.lineWidth = 3;
+    for (let i = -1; i < 10; i++) {
+      const x = i * 180 - cam * 0.5;
+      ctx.beginPath();
+      ctx.moveTo(x, 410);
+      ctx.lineTo(x - 110, canvas.height);
+      ctx.stroke();
+    }
+    return;
+  }
 
   if (level.storm) {
     const now = Date.now();
@@ -4674,6 +4806,65 @@ function drawBossProjectile(p) {
   ctx.fillRect(p.x + 3, p.y + 3, p.w - 6, p.h - 6);
 }
 
+function drawSleepwearPatch(x, y, w, h) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+  ctx.fillStyle = "#172947";
+  ctx.fillRect(x, y, w, h);
+  for (let stripeX = x + 3; stripeX < x + w; stripeX += 8) {
+    ctx.fillStyle = Math.floor((stripeX - x) / 8) % 2 === 0 ? "#f3f4ed" : "#77a8e7";
+    ctx.fillRect(stripeX, y, 2.5, h);
+  }
+  ctx.restore();
+  ctx.strokeStyle = "rgba(220, 232, 255, 0.82)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x, y, w, h);
+}
+
+function drawNightCap(headX, headTopY, facing) {
+  const capY = headTopY + 2;
+  ctx.save();
+  ctx.translate(headX + 10, 0);
+  ctx.scale(facing, 1);
+  ctx.beginPath();
+  ctx.moveTo(-10, capY + 5);
+  ctx.lineTo(-9, capY - 3);
+  ctx.lineTo(-4, capY - 10);
+  ctx.lineTo(1, capY - 13);
+  ctx.lineTo(8, capY - 7);
+  ctx.lineTo(10, capY + 5);
+  ctx.closePath();
+  ctx.save();
+  ctx.clip();
+  ctx.fillStyle = "#1a3158";
+  ctx.fillRect(-12, capY - 15, 25, 22);
+  ctx.strokeStyle = "#f4f5ee";
+  ctx.lineWidth = 2.4;
+  for (let stripeX = -14; stripeX < 14; stripeX += 7) {
+    ctx.beginPath();
+    ctx.moveTo(stripeX, capY + 7);
+    ctx.lineTo(stripeX + 18, capY - 17);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = "#78abe8";
+  ctx.lineWidth = 1.4;
+  for (let stripeX = -11; stripeX < 14; stripeX += 7) {
+    ctx.beginPath();
+    ctx.moveTo(stripeX, capY + 7);
+    ctx.lineTo(stripeX + 18, capY - 17);
+    ctx.stroke();
+  }
+  ctx.restore();
+  ctx.fillStyle = "#f5f4ed";
+  ctx.fillRect(-11, capY + 3, 22, 4);
+  ctx.beginPath();
+  ctx.arc(-12, capY, 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 function drawDachshund(dog) {
   const x = dog.x;
   const celebrating = state.mode === "celebrating";
@@ -4745,6 +4936,13 @@ function drawDachshund(dog) {
     ctx.fillRect(bx + 31, by + 5, 3, 3);
     ctx.fillStyle = "#000";
     ctx.fillRect(bx + 32, by + 6, 1, 1);
+
+    if (levelRuntime.id === 11) {
+      drawSleepwearPatch(bx + 15, by + 16, 24, 34);
+      drawSleepwearPatch(bx + 16, by + 49, 7, 17);
+      drawSleepwearPatch(bx + 31, by + 49, 7, 17);
+      drawNightCap(bx + 16, by - 1, -1);
+    }
 
     ctx.fillStyle = "#1d1a18";
     ctx.beginPath();
@@ -4849,6 +5047,14 @@ function drawDachshund(dog) {
     ctx.fillRect(x + 11, y + 35, 6, 4);
     ctx.fillRect(x + 27, y + 35, 6, 4);
     ctx.fillRect(x + 41, y + 35, 6, 4);
+  }
+
+  if (levelRuntime.id === 11) {
+    drawSleepwearPatch(x + 2, renderY + 8, 55, 20);
+    for (const legX of [x + 9, x + 25, x + 39]) {
+      drawSleepwearPatch(legX, renderY + 27, 8, 9);
+    }
+    drawNightCap(hx, renderY + 2, dog.facing);
   }
 
   if (Date.now() < state.combat.barkFlashUntil) {
@@ -5674,21 +5880,44 @@ function drawWindGustEffects(level, now) {
   const gustActive = now < level.windGustUntil;
   const timeUntilGust = level.windNextAt - now;
   const warning = timeUntilGust > 0 && timeUntilGust <= WIND_WARNING_MS;
-  if (!gustActive && !warning) return;
+  ctx.save();
+
+  // Scatter leaves along the ground, even during the longer calm periods.
+  for (let i = 0; i < 32; i++) {
+    const x = ((i * 91 - state.cameraX * 0.9) % (canvas.width + 40) + canvas.width + 40) % (canvas.width + 40) - 20;
+    const y = canvas.height - 26 - (i % 4) * 4;
+    ctx.save();
+    ctx.globalAlpha = 0.58;
+    ctx.translate(x, y);
+    ctx.rotate((i % 5) * 0.22 - 0.4);
+    ctx.fillStyle = ["#d99645", "#a9bd61", "#c86e43"][i % 3];
+    ctx.beginPath();
+    ctx.moveTo(-11, 0);
+    ctx.quadraticCurveTo(-1, -9, 12, -2);
+    ctx.quadraticCurveTo(5, 8, -11, 0);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  if (!gustActive && !warning) {
+    ctx.restore();
+    return;
+  }
 
   const span = canvas.width + 100;
-  const speed = gustActive ? 0.48 : 0.16;
-  ctx.save();
-  for (let i = 0; i < 15; i++) {
-    const travel = (now * speed + i * 137) % span;
+  const speed = gustActive ? 0.56 : 0.18;
+  const leafCount = gustActive ? 38 : 14;
+  for (let i = 0; i < leafCount; i++) {
+    const travel = (now * speed + i * 71) % span;
     const x = canvas.width + 50 - travel;
-    const y = 62 + (i * 73) % (canvas.height - 124) + Math.sin(now * 0.008 + i) * 10;
-    const sway = Math.sin(now * 0.006 + i * 1.3) * 0.55;
+    const liftPhase = ((now * (gustActive ? 0.00042 : 0.0002) + i * 0.19) % 1 + 1) % 1;
+    const y = canvas.height - 30 - liftPhase * (gustActive ? 285 : 75) + Math.sin(now * 0.006 + i) * 9;
+    const sway = Math.sin(now * 0.006 + i * 1.3) * 0.7;
     ctx.save();
-    ctx.globalAlpha = gustActive ? 0.88 : 0.5;
+    ctx.globalAlpha = gustActive ? 0.88 : 0.48;
     ctx.translate(x, y);
     ctx.rotate(sway);
-    ctx.fillStyle = ["#d99645", "#a9bd61", "#c86e43"][i % 3];
+    ctx.fillStyle = ["#d99645", "#a9bd61", "#c86e43", "#e4b04e"][i % 4];
     ctx.beginPath();
     ctx.moveTo(-11, 0);
     ctx.quadraticCurveTo(-1, -9, 12, -2);
@@ -5701,6 +5930,44 @@ function drawWindGustEffects(level, now) {
     ctx.lineTo(9, -2);
     ctx.stroke();
     ctx.restore();
+  }
+  ctx.restore();
+}
+
+function drawCasinoAshtray(tray, now) {
+  const x = tray.x;
+  const y = tray.y;
+  ctx.save();
+  ctx.fillStyle = "#302b36";
+  ctx.beginPath();
+  ctx.ellipse(x + 15, y, 17, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#aaa3ac";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = "#746d77";
+  ctx.fillRect(x + 3, y - 5, 24, 5);
+  ctx.save();
+  ctx.translate(x + 13, y - 8);
+  ctx.rotate(-0.15);
+  ctx.fillStyle = "#f2dfc7";
+  ctx.fillRect(0, -3, 23, 5);
+  ctx.fillStyle = "#e04d38";
+  ctx.fillRect(18, -3, 5, 5);
+  ctx.shadowColor = "#ff7648";
+  ctx.shadowBlur = 8;
+  ctx.fillStyle = "#ffd675";
+  ctx.fillRect(18, -2, 2, 3);
+  ctx.restore();
+  for (let i = 0; i < 3; i++) {
+    const phase = ((now * 0.0007 + i * 0.34 + tray.x * 0.003) % 1 + 1) % 1;
+    const smokeX = x + 24 + Math.sin(phase * Math.PI * 3 + i) * 6;
+    const smokeY = y - 12 - phase * 46 - i * 5;
+    ctx.globalAlpha = (1 - phase) * 0.3;
+    ctx.fillStyle = "#d7d2dc";
+    ctx.beginPath();
+    ctx.arc(smokeX, smokeY, 3 + phase * 4, 0, Math.PI * 2);
+    ctx.fill();
   }
   ctx.restore();
 }
@@ -5751,6 +6018,7 @@ function render() {
 
   for (const pool of level.lavaPools || []) drawLavaPool(pool);
   for (const p of level.platforms) drawPlatform(p);
+  for (const tray of level.ashtrays || []) drawCasinoAshtray(tray, now);
   for (const burst of state.dirtBursts) {
     ctx.fillStyle = burst.color;
     ctx.beginPath();
