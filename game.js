@@ -159,10 +159,12 @@ const WATER_MAX_VX = 2.4;
 const MOON_GRAVITY_FACTOR = 0.3;
 const MOON_JUMP_VELOCITY_FACTOR = 0.88;
 const MOON_MAX_FALL_SPEED = 6;
-const WIND_INTERVAL_MS = 30_000;
+const WIND_INTERVAL_MS = 7_000;
+const WIND_INITIAL_DELAY_MS = 1_800;
 const WIND_WARNING_MS = 2_400;
 const WIND_GUST_MS = 4_000;
 const WIND_PUSH_SPEED = 5;
+const STORM_RAMP_MS = 45_000;
 const CLOUD_PLATFORM_HOLD_MS = 2200;
 const CLOUD_PLATFORM_RESPAWN_MS = 3200;
 const DARK_SWITCH_REVEAL_MS = 5000;
@@ -513,6 +515,7 @@ if (LEVELS[2]) LEVELS[2].water = true;
 if (LEVELS[3]) LEVELS[3].moon = true;
 if (LEVELS[10]) LEVELS[10].night = true;
 if (LEVELS[11]) LEVELS[11].windGusts = true;
+if (LEVELS[12]) LEVELS[12].storm = true;
 if (LEVELS[4]) {
   LEVELS[4].volcano = true;
   LEVELS[4].lavaPools = buildLavaPools(LEVELS[4].platforms, LEVELS[4].worldWidth);
@@ -2732,6 +2735,7 @@ function hydrateLevelRuntime(level) {
     darkRevealUntil: 0,
     windNextAt: 0,
     windGustUntil: 0,
+    stormStartedAt: 0,
   };
 }
 
@@ -3049,9 +3053,10 @@ function beginLevelPlay() {
   }
   state.mode = "playing";
   if (levelRuntime.windGusts) {
-    levelRuntime.windNextAt = Date.now() + WIND_INTERVAL_MS;
+    levelRuntime.windNextAt = Date.now() + WIND_INITIAL_DELAY_MS;
     levelRuntime.windGustUntil = 0;
   }
+  if (levelRuntime.storm) levelRuntime.stormStartedAt = Date.now();
   const bossHint = levelRuntime.boss ? ` • BOSS LEVEL: ${levelRuntime.boss.name}` : "";
   statusEl.textContent = `${levelRuntime.name}: Collect ${state.totalBones} bones and reach the flag!${bossHint}`;
 }
@@ -3277,7 +3282,7 @@ function updateLightSwitches(level) {
 
 function updateWindGustCycle(level, now) {
   if (!level.windGusts) return false;
-  if (!level.windNextAt) level.windNextAt = now + WIND_INTERVAL_MS;
+  if (!level.windNextAt) level.windNextAt = now + WIND_INITIAL_DELAY_MS;
   if (now >= level.windNextAt) {
     level.windGustUntil = now + WIND_GUST_MS;
     level.windNextAt = now + WIND_INTERVAL_MS;
@@ -3390,6 +3395,10 @@ function update() {
     }
 
     if (windActive) dog.vx = Math.max(-WIND_PUSH_SPEED, dog.vx - WIND_PUSH_SPEED);
+    if (level.storm && state.keys.right) {
+      const stormStrength = Math.min(1, (now - level.stormStartedAt) / STORM_RAMP_MS);
+      dog.vx *= 1 - stormStrength * 0.62;
+    }
 
     const noMovementInput = !state.keys.left && !state.keys.right && !state.keys.jump && !state.keys.down && !windActive;
     if (noMovementInput && dog.onGround) {
@@ -3679,6 +3688,68 @@ function drawParallax() {
   const cam = state.cameraX;
   const level = levelRuntime;
 
+  if (level.storm) {
+    const now = Date.now();
+    const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    g.addColorStop(0, "#17243b");
+    g.addColorStop(0.58, "#38465a");
+    g.addColorStop(1, "#66717a");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // A distant funnel stays behind the landscape and is purely decorative.
+    const tornadoX = canvas.width * 0.76 - cam * 0.035;
+    const sway = Math.sin(now * 0.00045) * 8;
+    ctx.fillStyle = "rgba(22, 30, 43, 0.42)";
+    ctx.beginPath();
+    ctx.moveTo(tornadoX - 12, 190);
+    ctx.lineTo(tornadoX + 12, 190);
+    ctx.lineTo(tornadoX + 4 + sway, 310);
+    ctx.lineTo(tornadoX + 21 + sway, 365);
+    ctx.lineTo(tornadoX - 22 + sway, 365);
+    ctx.lineTo(tornadoX - 3 + sway, 310);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "rgba(30, 39, 50, 0.34)";
+    ctx.beginPath();
+    ctx.ellipse(tornadoX + sway, 370, 78, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Infrequent, brief lightning remains behind all gameplay objects.
+    const lightningSlot = Math.floor(now / 8_000);
+    const lightningPhase = (now % 8_000) / 8_000;
+    const flash = lightningPhase < 0.035 || (lightningPhase > 0.052 && lightningPhase < 0.067);
+    if (flash) {
+      ctx.fillStyle = `rgba(206, 224, 255, ${lightningPhase < 0.035 ? 0.12 : 0.06})`;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      const boltX = canvas.width * (0.2 + ((lightningSlot * 37) % 60) / 100);
+      ctx.strokeStyle = "rgba(226, 237, 255, 0.88)";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(boltX, 0);
+      ctx.lineTo(boltX - 13, 58);
+      ctx.lineTo(boltX + 9, 82);
+      ctx.lineTo(boltX - 24, 143);
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = "#47525b";
+    for (let i = 0; i < 11; i++) {
+      const x = i * 250 - cam * 0.26;
+      ctx.beginPath();
+      ctx.arc(x + 100, 510, 170, Math.PI, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = "#333e48";
+    for (let i = 0; i < 13; i++) {
+      const x = i * 220 - cam * 0.42;
+      ctx.beginPath();
+      ctx.arc(x + 80, 530, 125, Math.PI, Math.PI * 2);
+      ctx.fill();
+    }
+    return;
+  }
+
   if (level.water) {
     const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
     g.addColorStop(0, "#08365f");
@@ -3783,10 +3854,71 @@ function drawParallax() {
       const x = ((i * 139 - cam * 0.055) % starSpan + starSpan) % starSpan - 40;
       const y = 24 + (i * 47) % 235;
       const radius = i % 9 === 0 ? 2 : 1.2;
-      const alpha = 0.5 + (Math.sin(now * 0.002 + i * 1.7) + 1) * 0.2;
+      const twinkleRate = 0.0012 + ((i * 37) % 11) * 0.00023;
+      const twinklePhase = i * 2.399;
+      const alpha = 0.42 + (Math.sin(now * twinkleRate + twinklePhase) + 1) * 0.27;
       ctx.fillStyle = `rgba(230, 240, 255, ${alpha})`;
       ctx.beginPath();
       ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Staggered deterministic schedules keep the sky lively without flickering per frame.
+    const skyNoise = (seed) => {
+      const value = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
+      return value - Math.floor(value);
+    };
+    const shootingInterval = 4_800;
+    const shootingSlot = Math.floor(now / shootingInterval);
+    const shootingPhase = (now % shootingInterval) / shootingInterval;
+    if (shootingPhase < 0.13 && skyNoise(shootingSlot + 11) > 0.28) {
+      const progress = shootingPhase / 0.13;
+      const startX = skyNoise(shootingSlot + 23) * (canvas.width + 160) - 80;
+      const startY = 28 + skyNoise(shootingSlot + 31) * 175;
+      const x = startX + progress * 210;
+      const y = startY + progress * 105;
+      const tail = ctx.createLinearGradient(x - 72, y - 36, x, y);
+      tail.addColorStop(0, "rgba(190, 220, 255, 0)");
+      tail.addColorStop(1, "rgba(225, 240, 255, 0.95)");
+      ctx.strokeStyle = tail;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x - 72, y - 36);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+      ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
+      ctx.beginPath();
+      ctx.arc(x, y, 2.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // A larger comet crosses the full sky less often than the shooting stars.
+    const cometInterval = 28_000;
+    const cometSlot = Math.floor(now / cometInterval);
+    const cometPhase = (now % cometInterval) / cometInterval;
+    if (cometPhase < 0.16) {
+      const progress = cometPhase / 0.16;
+      const x = -100 + progress * (canvas.width + 200);
+      const y = 55 + Math.sin(progress * Math.PI * 2 + cometSlot) * 26;
+      const cometGlow = ctx.createRadialGradient(x, y, 1, x, y, 28);
+      cometGlow.addColorStop(0, "rgba(255, 245, 210, 0.85)");
+      cometGlow.addColorStop(1, "rgba(255, 190, 130, 0)");
+      ctx.fillStyle = cometGlow;
+      ctx.beginPath();
+      ctx.arc(x, y, 28, 0, Math.PI * 2);
+      ctx.fill();
+      const cometTail = ctx.createLinearGradient(x - 125, y - 48, x, y);
+      cometTail.addColorStop(0, "rgba(255, 170, 110, 0)");
+      cometTail.addColorStop(1, "rgba(255, 235, 190, 0.9)");
+      ctx.strokeStyle = cometTail;
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(x - 125, y - 48);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+      ctx.fillStyle = "#fff8dc";
+      ctx.beginPath();
+      ctx.arc(x, y, 4.5, 0, Math.PI * 2);
       ctx.fill();
     }
 
@@ -5573,6 +5705,25 @@ function drawWindGustEffects(level, now) {
   ctx.restore();
 }
 
+function drawStormRain(level, now) {
+  if (!level.storm) return;
+  const elapsed = level.stormStartedAt ? Math.max(0, now - level.stormStartedAt) : 0;
+  const intensity = Math.min(1, elapsed / STORM_RAMP_MS);
+  const count = 12 + Math.round(intensity * 68);
+  ctx.save();
+  ctx.strokeStyle = `rgba(202, 220, 244, ${0.22 + intensity * 0.38})`;
+  ctx.lineWidth = 1 + intensity * 0.5;
+  for (let i = 0; i < count; i++) {
+    const x = ((i * 83 + now * (0.045 + intensity * 0.12)) % (canvas.width + 30)) - 15;
+    const y = (i * 47 + now * (0.09 + intensity * 0.2)) % (canvas.height + 24) - 12;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x - 5 - intensity * 3, y + 13 + intensity * 9);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function render() {
   const level = levelRuntime;
   const now = Date.now();
@@ -5625,6 +5776,7 @@ function render() {
 
   drawDarknessOverlay(level);
   drawWindGustEffects(level, now);
+  drawStormRain(level, now);
   if (level.night) {
     ctx.save();
     ctx.fillStyle = "rgba(3, 7, 20, 0.2)";

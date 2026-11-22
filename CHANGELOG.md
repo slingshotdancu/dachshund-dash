@@ -1,5 +1,10 @@
 # Dachshund Dash Changelog
 
+## 2026-11-22
+### Level 13 builds into a distant thunderstorm
+- Added a slow rain-to-downpour ramp over the first 45 seconds of Level 13. Rain increasingly slows forward movement, but never pushes Henry backward; jumping and other levels are unchanged.
+- Added brief background lightning and a far-off, purely decorative tornado behind the level scenery.
+
 ## 2026-11-19
 ### Daily improvement: reduced-motion preference now covers every animated effect
 - Extended the existing reduced-motion support from the Start button to all CSS animations, transitions, and smooth scrolling, so players who request less motion no longer see persistent pulses or decorative character animations.
