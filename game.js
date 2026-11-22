@@ -608,7 +608,7 @@ if (LEVELS[8]) {
   ];
   LEVELS[8].bones = [
     { x: 250, y: 450, r: 11 },
-    { x: 520, y: 470, r: 11 },
+    { x: 520, y: 410, r: 11 },
     { x: 690, y: 210, r: 11 },
     { x: 1040, y: 290, r: 11 },
     { x: 1380, y: 210, r: 11 },
@@ -649,6 +649,8 @@ const state = {
   bonesCollected: 0,
   totalBones: LEVELS[0].totalBones,
   lives: MAX_LIVES,
+  debugInvincible: false,
+  invincibilityNoticeUntil: 0,
   levelRespawnsLeft: LEVEL_RESPAWNS,
   invulnerableUntil: 0,
   hitControlLockUntil: 0,
@@ -1758,6 +1760,8 @@ function goToStartScreen() {
   state.bonesCollected = 0;
   state.lives = MAX_LIVES;
   state.levelRespawnsLeft = LEVEL_RESPAWNS;
+  state.debugInvincible = false;
+  state.invincibilityNoticeUntil = 0;
   state.invulnerableUntil = 0;
   state.hitControlLockUntil = 0;
   state.capeUntil = 0;
@@ -1955,23 +1959,6 @@ function openLevelSelect() {
 
     stage.append(stageIcon, stageText);
 
-    const difficulty = document.createElement("span");
-    difficulty.className = "level-btn-difficulty";
-    const difficultyMeta = levelSelectChallengeBadge(lvl, idx);
-    difficulty.textContent = difficultyMeta.badgeText;
-    difficulty.dataset.tone = difficultyMeta.tone;
-
-    const length = document.createElement("span");
-    length.className = "level-btn-length";
-    length.textContent = levelSelectLengthText(lvl);
-
-    const focus = document.createElement("span");
-    focus.className = "level-btn-focus";
-    const focusMeta = levelSelectFocusPill(lvl);
-    focus.textContent = `${focusMeta.icon} ${focusMeta.text}`;
-    focus.setAttribute("aria-label", focusMeta.label);
-    focus.title = focusMeta.label;
-
     const pickupBits = [`${lvl.totalBones} bones`];
     if (lvl.hearts?.length) pickupBits.push(`${lvl.hearts.length} heart${lvl.hearts.length === 1 ? "" : "s"}`);
     if (lvl.capes?.length) pickupBits.push(`${lvl.capes.length} cape${lvl.capes.length === 1 ? "" : "s"}`);
@@ -2005,13 +1992,6 @@ function openLevelSelect() {
     hazards.className = "level-btn-hazards";
     hazards.textContent = levelSelectHazardText(lvl);
 
-    const goal = document.createElement("span");
-    goal.className = "level-btn-goal";
-    const goalPreview = levelSelectGoalPreview(lvl);
-    goal.textContent = goalPreview.text;
-    goal.setAttribute("aria-label", goalPreview.label);
-    goal.title = goalPreview.label;
-
     const tip = document.createElement("span");
     tip.className = "level-btn-tip";
     tip.textContent = levelSelectTipText(lvl);
@@ -2032,10 +2012,10 @@ function openLevelSelect() {
     meta.className = "level-btn-meta";
     meta.textContent = badges.length ? badges.join(" • ") : "Classic run";
 
-    btn.append(levelLabel, currentBadge, stage, difficulty, length, focus, goal, tip, hazards, stats, meta);
+    btn.append(levelLabel, currentBadge, stage, tip, hazards, stats, meta);
     btn.setAttribute(
       "aria-label",
-      `${isCurrentLevel ? `${state.mode === "start" ? "Default start, " : "Current level, "}` : ""}${lvl.name}, ${difficultyMeta.text.replace(/^Challenge:\s*/, "challenge ")}, ${levelSelectHazardText(lvl).replace(/^Hazards:\s*/, "")}, ${pickupBits.join(", ")}${badges.length ? `, ${badges.join(", ")}` : ", classic run"}`
+      `${isCurrentLevel ? `${state.mode === "start" ? "Default start, " : "Current level, "}` : ""}${lvl.name}, ${levelSelectStageText(lvl)}, ${levelSelectHazardText(lvl).replace(/^Hazards:\s*/, "")}, ${pickupBits.join(", ")}${badges.length ? `, ${badges.join(", ")}` : ", classic run"}`
     );
     if (isCurrentLevel) currentLevelBtn = btn;
     btn.addEventListener("click", () => {
@@ -2566,7 +2546,7 @@ function applyHitKnockback() {
 
 function takeHit(reasonText) {
   const now = Date.now();
-  if (now < state.invulnerableUntil || state.mode !== "playing") return;
+  if (state.debugInvincible || now < state.invulnerableUntil || state.mode !== "playing") return;
 
   const lethal = state.lives <= 1;
   state.lives -= 1;
@@ -3012,6 +2992,8 @@ function loadLevel(index, options = {}) {
   levelRuntime = hydrateLevelRuntime(LEVELS[index]);
   state.totalBones = levelRuntime.totalBones;
   state.bonesCollected = 0;
+  state.debugInvincible = false;
+  state.invincibilityNoticeUntil = 0;
   state.combat.barkWaves = [];
   state.combat.barkCooldownUntil = 0;
   state.invulnerableUntil = 0;
@@ -3525,7 +3507,14 @@ function update() {
 
   if (dog.onGround) state.airJumpsUsed = 0;
 
-  if (dog.y > canvas.height + 120) takeHit("You fell!");
+  if (dog.y > canvas.height + 120) {
+    if (state.debugInvincible) {
+      resetPlayerPosition();
+      state.cameraX = 0;
+    } else {
+      takeHit("You fell!");
+    }
+  }
 
   for (const b of level.bones) {
     if (!b.taken && intersects(dog, { x: b.x - b.r, y: b.y - b.r, w: b.r * 2, h: b.r * 2 })) {
@@ -5528,6 +5517,25 @@ function render() {
   ctx.restore();
 
   drawDarknessOverlay(level);
+  if (level.moon && state.mode === "playing" && state.dog.y + state.dog.h < 0) {
+    const markerX = Math.max(14, Math.min(canvas.width - 14, state.dog.x + state.dog.w / 2 - state.cameraX));
+    ctx.save();
+    ctx.globalAlpha = Math.floor(now / 300) % 2 === 0 ? 1 : 0.35;
+    ctx.fillStyle = "#ffe27a";
+    ctx.strokeStyle = "rgba(8, 17, 35, 0.95)";
+    ctx.lineWidth = 4;
+    ctx.lineJoin = "round";
+    ctx.shadowColor = "rgba(255, 226, 122, 0.9)";
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    ctx.moveTo(markerX, 3);
+    ctx.lineTo(markerX - 10, 19);
+    ctx.lineTo(markerX + 10, 19);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
   if (level.dark && !(level.darkRevealUntil > Date.now())) {
     ctx.save();
     ctx.translate(-state.cameraX, 0);
@@ -5635,6 +5643,30 @@ function render() {
   }
 
   drawOverlay();
+
+  if (state.invincibilityNoticeUntil > now) {
+    ctx.save();
+    ctx.font = "bold 22px 'Roboto', system-ui";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const notice = "Invincibility Activated!";
+    const noticeWidth = ctx.measureText(notice).width + 34;
+    const noticeX = (canvas.width - noticeWidth) / 2;
+    const noticeY = 54;
+    ctx.fillStyle = "rgba(8, 24, 37, 0.94)";
+    ctx.strokeStyle = "rgba(137, 255, 183, 0.9)";
+    ctx.lineWidth = 2;
+    ctx.shadowColor = "rgba(90, 255, 154, 0.5)";
+    ctx.shadowBlur = 16;
+    ctx.beginPath();
+    ctx.roundRect(noticeX, noticeY, noticeWidth, 42, 12);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#d9ffe5";
+    ctx.shadowBlur = 0;
+    ctx.fillText(notice, canvas.width / 2, noticeY + 21);
+    ctx.restore();
+  }
 
   const barkBtn = document.getElementById("btn-bark");
   if (barkBtn) {
@@ -5977,13 +6009,39 @@ window.addEventListener("keydown", (e) => {
     }
   }
 
-  if (/^Key[A-Z]$/.test(e.code)) {
-    state.cheatBuffer = (state.cheatBuffer + e.code.replace("Key", "").toLowerCase()).slice(-12);
-    if (state.cheatBuffer.includes("henry")) {
+  if (/^(Key[A-Z]|Digit[0-9])$/.test(e.code)) {
+    const typedCharacter = e.code.startsWith("Key") ? e.code.slice(3).toLowerCase() : e.code.slice(5);
+    state.cheatBuffer = (state.cheatBuffer + typedCharacter).slice(-12);
+    if (state.cheatBuffer.endsWith("henry")) {
       stopBgMusic();
       playSecretSound();
       openLevelSelect();
       state.cheatBuffer = "";
+      e.preventDefault();
+      return;
+    }
+
+    if (state.cheatBuffer.endsWith("h3nry")) {
+      state.cheatBuffer = "";
+      if (["playing", "title"].includes(state.mode)) {
+        state.debugInvincible = true;
+        state.invincibilityNoticeUntil = Date.now() + 2600;
+        statusEl.textContent = "Invincibility Activated!";
+      }
+      e.preventDefault();
+      return;
+    }
+
+    const codes = ["henry", "h3nry"];
+    const pendingCode = codes.some((code) => {
+      const maxPrefixLength = Math.min(state.cheatBuffer.length, code.length - 1);
+      for (let length = maxPrefixLength; length > 0; length -= 1) {
+        if (code.startsWith(state.cheatBuffer.slice(-length))) return true;
+      }
+      return false;
+    });
+    if (pendingCode) {
+      e.preventDefault();
       return;
     }
   }
