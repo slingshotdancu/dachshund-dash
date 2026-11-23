@@ -208,6 +208,9 @@ const HIT_KNOCKBACK_Y = -7.2;
 const HIT_KNOCKBACK_LOCK_MS = 150;
 
 const CAPE_FLIGHT_MS = 20000;
+const PAW_POWER_MS = 30000;
+const PAW_DIG_MS = 120;
+const PAW_BARK_INTERVAL_MS = 420;
 const CAPE_LIFT = 0.68;
 const CAPE_DESCEND = 0.5;
 const CAPE_MAX_RISE = -6.2;
@@ -666,6 +669,265 @@ if (LEVELS[14]) {
 
 applyTunnelEnemySwap(LEVELS);
 
+// ---- Level 16: underground dig stage (surface ledge, dig down, sleeping moles, giant paw) ----
+// Cell legend: # dirt (diggable), = bedrock, . air, M mole pocket, P giant paw, F finish flag.
+// Row r sits at world y = (r - 1) * 80; row 0 is an invisible ceiling so Henry can't jump out.
+const UG_CELL = 80;
+const UG_RLE = [
+  "40=",
+  "3.1=36.",
+  "3#1=36#",
+  "40#",
+  "6#1M2.1M4.26#",
+  "6#8.26#",
+  "18#9.13#",
+  "18#3.1M5.13#",
+  "18#9.3#4.1M1.4#",
+  "30#1P4.1F4#",
+  "40#",
+];
+const UG_BONE_CELLS = [[7, 4], [11, 5], [20, 6], [19, 7], [24, 7], [31, 8], [33, 9]];
+
+function ugExpandRow(rle) {
+  let out = "";
+  const re = /(\d+)(.)/g;
+  let m;
+  while ((m = re.exec(rle))) out += m[2].repeat(Number(m[1]));
+  return out;
+}
+
+function buildUndergroundLevel() {
+  const map = UG_RLE.map(ugExpandRow);
+  const cols = map[0].length;
+  if (map.some((row) => row.length !== cols)) throw new Error("underground map rows must all be " + cols + " cells wide");
+  const rows = map.length;
+  const cellY = (r) => (r - 1) * UG_CELL;
+  const isSolid = (r, c) => {
+    const ch = map[r]?.[c];
+    return ch === "#" || ch === "=";
+  };
+  const platforms = [];
+  const index = new Map();
+  let paw = null;
+  let flag = null;
+  const enemies = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const ch = map[r][c];
+      if (ch === "#" || ch === "=") {
+        index.set(r + "," + c, platforms.length);
+        platforms.push({ x: c * UG_CELL, y: cellY(r), w: UG_CELL, h: UG_CELL, ...(ch === "#" ? { diggable: true } : {}) });
+      }
+      if (ch === "P") paw = { x: c * UG_CELL + 12, y: cellY(r) + 12, w: 56, h: 56 };
+      if (ch === "F") flag = { x: c * UG_CELL + 32, y: cellY(r) + UG_CELL - 100, w: 16, h: 100 };
+    }
+  }
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (map[r][c] !== "M") continue;
+      let left = c;
+      while (left - 1 >= 0 && !isSolid(r, left - 1)) left--;
+      let right = c;
+      while (right + 1 < cols && !isSolid(r, right + 1)) right++;
+      // Moles stay asleep until one of the dirt cells touching their pocket is dug out.
+      const watch = [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]]
+        .filter(([rr, cc]) => map[rr]?.[cc] === "#")
+        .map(([rr, cc]) => index.get(rr + "," + cc));
+      enemies.push({
+        x: c * UG_CELL + 19,
+        y: cellY(r) + UG_CELL - 28,
+        w: 42,
+        h: 28,
+        dir: enemies.length % 2 ? -1 : 1,
+        minX: left * UG_CELL + 4,
+        maxX: (right + 1) * UG_CELL - 4,
+        speed: 1.4,
+        kind: "mole",
+        dormant: true,
+        watch,
+      });
+    }
+  }
+  const bones = UG_BONE_CELLS.map(([c, r]) => ({ x: c * UG_CELL + 40, y: cellY(r) + 40, r: 11 }));
+
+  // Solvability checks: the start ledge is sealed off, and the flag is reachable only by digging.
+  const start = [1, 1];
+  const airOnly = new Set();
+  const airQueue = [[1, 0]];
+  while (airQueue.length) {
+    const [r, c] = airQueue.shift();
+    const key = r + "," + c;
+    if (airOnly.has(key) || isSolid(r, c) || !map[r]?.[c]) continue;
+    airOnly.add(key);
+    for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) airQueue.push([r + dr, c + dc]);
+  }
+  if (airOnly.size !== 3) throw new Error("start ledge should be sealed, got " + airOnly.size + " air cells");
+  const seen = new Set();
+  const queue = [start];
+  let reached = false;
+  while (queue.length) {
+    const [r, c] = queue.shift();
+    const key = r + "," + c;
+    if (seen.has(key) || r < 1 || r >= rows || c < 0 || c >= cols || map[r][c] === "=") continue;
+    seen.add(key);
+    if (map[r][c] === "F") reached = true;
+    for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) queue.push([r + dr, c + dc]);
+  }
+  if (!reached) throw new Error("finish flag unreachable by digging");
+  if (!paw || !flag) throw new Error("paw and flag must exist on the map");
+  return { platforms, enemies, bones, paw, flag };
+}
+
+const UG_BUILT = buildUndergroundLevel();
+Object.assign(LEVELS[15], {
+  underground: true,
+  tunnel: true,
+  worldWidth: 40 * UG_CELL,
+  worldHeight: UG_RLE.length * UG_CELL - UG_CELL,
+  totalBones: UG_BUILT.bones.length,
+  platforms: UG_BUILT.platforms,
+  spikes: [],
+  lavaPools: [],
+  enemies: UG_BUILT.enemies,
+  bones: UG_BUILT.bones,
+  hearts: [],
+  capes: [],
+  sirens: [],
+  toys: [],
+  paws: [UG_BUILT.paw],
+  finishFlag: UG_BUILT.flag,
+  startPos: { x: 83, y: UG_CELL - 36 },
+  boss: null,
+});
+
+// Underground dig targets: holding Left/Right while Down digs that side; otherwise Down digs the cell under Henry.
+function getUndergroundDigTarget(level) {
+  const dog = state.dog;
+  const cx = dog.x + dog.w / 2;
+  const overlapsX = (p) => dog.x + dog.w > p.x + 8 && dog.x < p.x + p.w - 8;
+  const overlapsY = (p) => dog.y + dog.h > p.y + 8 && dog.y < p.y + p.h - 8;
+  const wallRight = (p) => dog.x + dog.w >= p.x - 10 && dog.x + dog.w <= p.x + 16 && overlapsY(p);
+  const wallLeft = (p) => dog.x <= p.x + p.w + 10 && dog.x >= p.x + p.w - 16 && overlapsY(p);
+  const diggable = level.platforms.filter((p) => p.diggable && !p.dugOut);
+  if (state.keys.right) {
+    const p = diggable.find(wallRight);
+    if (p) return { platform: p, contact: "right" };
+  }
+  if (state.keys.left) {
+    const p = diggable.find(wallLeft);
+    if (p) return { platform: p, contact: "left" };
+  }
+  if (dog.onGround) {
+    let best = null;
+    let bestDist = Infinity;
+    for (const p of diggable) {
+      if (Math.abs(dog.y + dog.h - p.y) > 8 || !overlapsX(p)) continue;
+      const d = Math.abs(p.x + p.w / 2 - cx);
+      if (d < bestDist) {
+        best = p;
+        bestDist = d;
+      }
+    }
+    if (best) return { platform: best, contact: "top" };
+  }
+  return null;
+}
+
+function pawPowerActive() {
+  return Date.now() < state.pawUntil;
+}
+
+function spawnPawDirtSpray(count, nearDog = false) {
+  const dog = state.dog;
+  for (let i = 0; i < count; i++) {
+    const x = nearDog
+      ? dog.x + dog.w / 2 + (Math.random() - 0.5) * 160
+      : state.cameraX - 80 + Math.random() * (canvas.width + 160);
+    const y = nearDog ? dog.y + Math.random() * 40 : state.cameraY + Math.random() * canvas.height;
+    state.dirtBursts.push({
+      x,
+      y,
+      vx: (Math.random() - 0.5) * 7,
+      vy: -1.5 - Math.random() * 4,
+      r: 2.5 + Math.random() * 4,
+      bornAt: Date.now(),
+      life: 900 + Math.random() * 600,
+      color: i % 3 === 0 ? "#7f5632" : i % 2 === 0 ? "#9e7245" : "#5f3e24",
+    });
+  }
+}
+
+function drawUndergroundBackdrop(cam) {
+  const w = canvas.width;
+  const h = canvas.height;
+  const cave = ctx.createLinearGradient(0, 0, 0, h);
+  cave.addColorStop(0, "#2b1a10");
+  cave.addColorStop(1, "#120a06");
+  ctx.fillStyle = cave;
+  ctx.fillRect(0, 0, w, h);
+  const skyAlpha = Math.max(0, Math.min(1, 1 - state.cameraY / 180));
+  if (skyAlpha > 0) {
+    const sky = ctx.createLinearGradient(0, 0, 0, h * 0.5);
+    sky.addColorStop(0, "#7fd0ff");
+    sky.addColorStop(1, "#d8f4ff");
+    ctx.save();
+    ctx.globalAlpha = skyAlpha;
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, w, h * 0.5);
+    ctx.restore();
+  }
+  // Pebbles and flecks drift slowly for depth.
+  for (let i = 0; i < 70; i++) {
+    const px = (((i * 97 - cam * 0.25) % (w + 40)) + w + 40) % (w + 40) - 20;
+    const py = ((i * 53 - state.cameraY * 0.3) % h + h) % h;
+    ctx.fillStyle = i % 3 === 0 ? "rgba(255, 230, 180, 0.12)" : "rgba(0, 0, 0, 0.25)";
+    ctx.beginPath();
+    ctx.arc(px, py, 2 + (i % 4), 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawPawAura(dog) {
+  if (!pawPowerActive()) return;
+  const now = Date.now();
+  const cx = dog.x + dog.w / 2;
+  const cy = dog.y + dog.h / 2;
+  const radius = 62 + Math.sin(now * 0.014) * 10;
+  ctx.save();
+  const g = ctx.createRadialGradient(cx, cy, 8, cx, cy, radius);
+  g.addColorStop(0, "rgba(255, 236, 150, 0.7)");
+  g.addColorStop(0.6, "rgba(255, 150, 60, 0.35)");
+  g.addColorStop(1, "rgba(255, 90, 30, 0)");
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawGiantPaw(pw, now) {
+  const cx = pw.x + pw.w / 2;
+  const cy = pw.y + pw.h / 2 + Math.sin(now * 0.006) * 3;
+  ctx.save();
+  ctx.shadowColor = "#ffd34d";
+  ctx.shadowBlur = 18 + Math.sin(now * 0.008) * 6;
+  ctx.fillStyle = "#f2d2a8";
+  ctx.strokeStyle = "#7a4b2a";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + 12, 22, 18, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  for (const [dx, dy, rx, ry] of [[-20, -10, 8, 10], [-7, -18, 8, 11], [7, -18, 8, 11], [20, -10, 8, 10]]) {
+    ctx.beginPath();
+    ctx.ellipse(cx + dx, cy + dy, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+
 const mobileControlState = {
   enabled: false,
   immersive: false,
@@ -693,6 +955,9 @@ const state = {
   invulnerableUntil: 0,
   hitControlLockUntil: 0,
   capeUntil: 0,
+  pawUntil: 0,
+  pawLastBarkAt: 0,
+  cameraY: 0,
   levelTitleUntil: 0,
   celebrateUntil: 0,
   pendingNextLevel: null,
@@ -822,6 +1087,7 @@ function spawnDigDirtBurst(platform, contact = "side", options = {}) {
 
 function getTunnelDigTarget(level = levelRuntime) {
   if (!level?.tunnel) return null;
+  if (level.underground) return getUndergroundDigTarget(level);
   const dog = state.dog;
   for (const p of level.platforms) {
     if (!p.diggable || p.dugOut) continue;
@@ -874,7 +1140,8 @@ function updateTunnelDigging(level, now) {
   const { platform, contact } = digTarget;
   const boosted = now < state.tunnelDigBoostUntil;
   const elapsed = state.tunnelDigTarget === platform ? Math.max(0, now - (state.tunnelDigLastAt || now)) : 0;
-  platform.digProgress = Math.min(1, (platform.digProgress || 0) + elapsed / (boosted ? TUNNEL_DIG_FAST_MS : TUNNEL_DIG_SLOW_MS));
+  const digMs = pawPowerActive() ? PAW_DIG_MS : boosted ? TUNNEL_DIG_FAST_MS : TUNNEL_DIG_SLOW_MS;
+  platform.digProgress = Math.min(1, (platform.digProgress || 0) + elapsed / digMs);
   state.tunnelDigTarget = platform;
   state.tunnelDigLastAt = now;
   state.digUntil = Math.max(state.digUntil, now + 120);
@@ -1806,6 +2073,7 @@ function goToStartScreen() {
   state.invulnerableUntil = 0;
   state.hitControlLockUntil = 0;
   state.capeUntil = 0;
+  state.pawUntil = 0;
   state.levelTitleUntil = 0;
   state.celebrateUntil = 0;
   state.pendingNextLevel = null;
@@ -1830,7 +2098,7 @@ function goToStartScreen() {
   stopCapeSound();
   stopCapeAmbient();
   stopTornadoSound();
-  state.cameraX = 0;
+  state.cameraX = 0; state.cameraY = 0;
   state.jumpBufferedUntil = 0;
   state.lastGroundedAt = 0;
   levelRuntime = hydrateLevelRuntime(LEVELS[0]);
@@ -2766,6 +3034,10 @@ function hydrateLevelRuntime(level) {
     sirens: (level.sirens || []).map((s) => ({ ...s })),
     toys: (level.toys || []).map((t) => ({ ...t })),
     ashtrays: (level.ashtrays || []).map((a) => ({ ...a, nextSneezeAt: 0 })),
+    paws: (level.paws || []).map((p) => ({ ...p, taken: false })),
+    startPos: level.startPos ? { ...level.startPos } : null,
+    underground: Boolean(level.underground),
+    worldHeight: level.worldHeight || null,
     lightSwitches: (level.lightSwitches || []).map((s) => ({ ...s, on: false, wasTouching: false, litUntil: 0, rearmLocked: false })),
     darkRevealUntil: 0,
     windNextAt: 0,
@@ -2782,8 +3054,8 @@ let levelRuntime = hydrateLevelRuntime(LEVELS[0]);
 
 function resetPlayerPosition() {
   resetCircusBall(levelRuntime);
-  state.dog.x = START_X;
-  state.dog.y = START_Y;
+  state.dog.x = levelRuntime?.startPos?.x ?? START_X;
+  state.dog.y = levelRuntime?.startPos?.y ?? START_Y;
   state.dog.vx = 0;
   state.dog.vy = 0;
   state.dog.onGround = false;
@@ -3033,7 +3305,7 @@ function loadLevel(index, options = {}) {
   state.currentLevelIndex = index;
   state.mode = "title";
   state.levelTitleUntil = Date.now() + LEVEL_TITLE_MS;
-  state.cameraX = 0;
+  state.cameraX = 0; state.cameraY = 0;
 
   if (!preserveRespawns) state.levelRespawnsLeft = LEVEL_RESPAWNS;
 
@@ -3050,6 +3322,7 @@ function loadLevel(index, options = {}) {
   state.invulnerableUntil = 0;
   state.hitControlLockUntil = 0;
   state.capeUntil = 0;
+  state.pawUntil = 0;
   state.bossProjectiles = [];
   state.airJumpsUsed = 0;
   state.lastJumpTapAt = 0;
@@ -3872,7 +4145,7 @@ function update() {
     particle.y += particle.vy;
     particle.vy += 0.22;
     particle.vx *= 0.98;
-    return Date.now() - particle.bornAt < particle.life && particle.y < canvas.height + 40;
+    return Date.now() - particle.bornAt < particle.life && particle.y < state.cameraY + canvas.height + 40;
   });
 
   if (Date.now() >= state.hitControlLockUntil) {
@@ -4050,10 +4323,10 @@ function update() {
 
   if (dog.onGround) state.airJumpsUsed = 0;
 
-  if (dog.y > canvas.height + 120) {
+  if (dog.y > (level.underground ? level.worldHeight : canvas.height) + 120) {
     if (state.debugInvincible) {
       resetPlayerPosition();
-      state.cameraX = 0;
+      state.cameraX = 0; state.cameraY = 0;
     } else {
       takeHit("You fell!");
     }
@@ -4086,6 +4359,24 @@ function update() {
       state.toyHeld = true;
       statusEl.textContent = `${level.name}: Toy collected! Press Shift/F/K to throw at the siren.`;
     }
+  }
+
+  for (const pw of level.paws || []) {
+    if (!pw.taken && intersects(dog, pw)) {
+      pw.taken = true;
+      state.pawUntil = Date.now() + PAW_POWER_MS;
+      state.pawLastBarkAt = Date.now();
+      playSuperBarkSound();
+      statusEl.textContent = `${level.name}: Giant paw! Dig fast for 30 seconds`;
+    }
+  }
+  if (pawPowerActive() && state.mode === "playing") {
+    if (now - state.pawLastBarkAt >= PAW_BARK_INTERVAL_MS) {
+      state.pawLastBarkAt = now;
+      triggerBark();
+    }
+    spawnPawDirtSpray(3);
+    if (state.keys.down) spawnPawDirtSpray(4, true);
   }
 
   for (const c of level.capes || []) {
@@ -4130,6 +4421,12 @@ function update() {
 
   for (const e of level.enemies) {
     if (e.dead) continue;
+
+    if (e.dormant) {
+      if (!(e.watch || []).some((i) => level.platforms[i]?.dugOut)) continue;
+      e.dormant = false;
+      statusEl.textContent = `${level.name}: A mole woke up!`;
+    }
 
     if (e.dying) {
       e.vy += ENEMY_DEATH_GRAVITY;
@@ -4195,6 +4492,12 @@ function update() {
 
   const targetCam = dog.x - canvas.width * 0.35;
   state.cameraX = Math.max(0, Math.min(level.worldWidth - canvas.width, targetCam));
+  if (level.underground) {
+    const targetCamY = dog.y - canvas.height * 0.42;
+    state.cameraY = Math.max(0, Math.min(level.worldHeight - canvas.height, targetCamY));
+  } else {
+    state.cameraY = 0;
+  }
 }
 
 function drawParallax() {
@@ -4203,6 +4506,10 @@ function drawParallax() {
 
   if (level.circus) {
     drawCircusBackdrop(cam);
+    return;
+  }
+  if (level.underground) {
+    drawUndergroundBackdrop(cam);
     return;
   }
 
@@ -6494,7 +6801,7 @@ function render() {
   drawParallax();
 
   ctx.save();
-  ctx.translate(-state.cameraX, 0);
+  ctx.translate(-state.cameraX, -state.cameraY);
 
   for (const pool of level.lavaPools || []) drawLavaPool(pool);
   for (const p of level.platforms) drawPlatform(p);
@@ -6508,6 +6815,7 @@ function render() {
   }
   for (const s of level.spikes) drawSpike(s);
   for (const b of level.bones) drawBone(b);
+  for (const pw of level.paws || []) if (!pw.taken) drawGiantPaw(pw, Date.now());
   for (const h of level.hearts || []) drawHeartPickup(h);
   for (const c of level.capes || []) drawCapePickup(c);
   for (const t of level.toys || []) drawToy(t);
@@ -6519,6 +6827,7 @@ function render() {
   for (const p of state.bossProjectiles) drawBossProjectile(p);
   if (state.toyProjectile) drawToyProjectile(state.toyProjectile);
   drawFlag(level.finishFlag);
+  drawPawAura(state.dog);
   drawCircusAwareDog(level);
   drawCircusHoopFronts(level, now);
   drawCircusBallAndTimer(level, now);
