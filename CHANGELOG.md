@@ -1,5 +1,14 @@
 # Dachshund Dash Changelog
 
+## 2026-11-24
+### Level 16 goes underground
+- Added a fully underground dig stage. Henry starts on a small surface ledge that is sealed by bedrock, so the only way forward is down. Hold Down to dig the dirt beneath him and drop into the hole; hold Down with Left or Right to dig sideways.
+- Moles sleep in air pockets and stay put until you dig out a dirt block touching their pocket, then they start patrolling.
+- Added a giant paw power-up next to the finish flag. For 30 seconds Henry glows and pulses, barks about every 0.4 seconds, digs very fast, and dirt sprays across the screen.
+- Seven bones are spread through the pockets. The camera follows Henry as he digs downward.
+
+![Level 16 underground stage with the giant paw power active, dirt flying, and Henry glowing](changelog/2026-11-24-level-16-underground.png)
+
 ## 2026-11-22
 ### Level 15 becomes a circus
 - Added a big-top backdrop with striped canopy, spotlights, and seals on pedestals (some balancing balls).
